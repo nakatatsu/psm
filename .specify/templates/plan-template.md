@@ -31,7 +31,11 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| # | Principle | Gate Question | Pass? |
+|---|-----------|---------------|-------|
+| I | Simplicity First | Is this the simplest viable design? No unnecessary abstractions or dependencies? | |
+| II | YAGNI | Does every element serve a present, concrete need? No speculative features? | |
+| III | Test-First (NON-NEGOTIABLE) | Are all tests written before implementation (Red-Green cycle)? Using `go test` only? No third-party test frameworks? | |
 
 ## Project Structure
 
