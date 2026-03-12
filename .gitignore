@@ -32,6 +32,7 @@ go.work.sum
 # .vscode/
 
 .tmp/
+.gh-token
 
 # Built binary
 psm

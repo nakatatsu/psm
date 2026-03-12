@@ -1,0 +1,52 @@
+services:
+  workspace:
+    build:
+      context: ./workspace
+      dockerfile: Dockerfile
+      args:
+        TZ: ${TZ:-America/Los_Angeles}
+        CLAUDE_CODE_VERSION: latest
+        GIT_DELTA_VERSION: "0.18.2"
+        ZSH_IN_DOCKER_VERSION: "1.2.0"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - claude-code-bashhistory:/commandhistory
+      - claude-code-config:/home/node/.claude
+      - ${LOCAL_WORKSPACE_FOLDER:-..}:/workspace:delegated
+    environment:
+      NODE_OPTIONS: "--max-old-space-size=4096"
+      CLAUDE_CONFIG_DIR: /home/node/.claude
+      POWERLEVEL9K_DISABLE_GITSTATUS: "true"
+      AWS_SANDBOX_SSO_START_URL: ${AWS_SANDBOX_SSO_START_URL:-}
+      AWS_SANDBOX_SSO_ACCOUNT_ID: ${AWS_SANDBOX_SSO_ACCOUNT_ID:-}
+      AWS_SSO_ROLE_NAME: ai-agent
+      AWS_SSO_REGION: ap-northeast-1
+    command: sleep infinity
+    depends_on:
+      gh-token-sidecar:
+        condition: service_healthy
+
+  gh-token-sidecar:
+    build:
+      context: ./gh-token-sidecar
+      dockerfile: Dockerfile
+    volumes:
+      - ${GH_APP_PEM_PATH}:/secrets/private-key.pem:ro
+    environment:
+      GH_APP_CLIENT_ID: ${GH_APP_CLIENT_ID}
+      GH_APP_INSTALLATION_ID: ${GH_APP_INSTALLATION_ID}
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  claude-code-bashhistory:
+  claude-code-config:

@@ -1,18 +1,8 @@
 {
   "name": "Claude Code Sandbox",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "args": {
-      "TZ": "${localEnv:TZ:America/Los_Angeles}",
-      "CLAUDE_CODE_VERSION": "latest",
-      "GIT_DELTA_VERSION": "0.18.2",
-      "ZSH_IN_DOCKER_VERSION": "1.2.0"
-    }
-  },
-  "runArgs": [
-    "--cap-add=NET_ADMIN",
-    "--cap-add=NET_RAW"
-  ],
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "workspace",
+  "workspaceFolder": "/workspace",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -41,21 +31,6 @@
     }
   },
   "remoteUser": "node",
-  "mounts": [
-    "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
-    "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
-  ],
-  "containerEnv": {
-    "NODE_OPTIONS": "--max-old-space-size=4096",
-    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
-    "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
-    "AWS_SANDBOX_SSO_START_URL": "${localEnv:AWS_SANDBOX_SSO_START_URL}",
-    "AWS_SANDBOX_SSO_ACCOUNT_ID": "${localEnv:AWS_SANDBOX_SSO_ACCOUNT_ID}",
-    "AWS_SSO_ROLE_NAME": "ai-agent",
-    "AWS_SSO_REGION": "ap-northeast-1"
-  },
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
-  "workspaceFolder": "/workspace",
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && /workspace/.devcontainer/setup-aws-config.sh",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && /workspace/.devcontainer/setup-aws-config.sh && claude plugin install skill-creator@claude-plugins-official --scope user && claude plugin install code-review@claude-plugins-official --scope project",
   "waitFor": "postStartCommand"
 }
