@@ -9,12 +9,9 @@ ARG CLAUDE_CODE_VERSION=latest
 ARG AWS_CLI_VERSION=2.33.31
 ARG GO_VERSION=1.26.1
 ARG GOFUMPT_VERSION=0.9.2
-ARG GOIMPORTS_VERSION=0.42.0
 ARG GOLANGCI_LINT_VERSION=2.11.3
 ARG GOVULNCHECK_VERSION=1.1.4
-ARG GOSEC_VERSION=2.23.0
 ARG OSV_SCANNER_VERSION=2.3.3
-ARG STATICCHECK_VERSION=2026.1
 ARG GIT_DELTA_VERSION=0.18.2
 ARG ZSH_IN_DOCKER_VERSION=1.2.0
 
@@ -74,17 +71,7 @@ ENV PATH=$PATH:/home/node/go/bin
 
 RUN mkdir -p /home/node/go/bin && chown -R node:node /home/node/go
 
-# staticcheck (binary from GitHub Releases — avoids proxy.golang.org dependency)
-RUN ARCH=$(dpkg --print-architecture) && \
-  if [ "$ARCH" = "amd64" ]; then SC_ARCH="amd64"; \
-  elif [ "$ARCH" = "arm64" ]; then SC_ARCH="arm64"; fi && \
-  wget -q "https://github.com/dominikh/go-tools/releases/download/${STATICCHECK_VERSION}/staticcheck_linux_${SC_ARCH}.tar.gz" -O /tmp/staticcheck.tar.gz && \
-  tar xzf /tmp/staticcheck.tar.gz -C /tmp/ && \
-  mv /tmp/staticcheck/staticcheck /usr/local/bin/staticcheck && \
-  chmod +x /usr/local/bin/staticcheck && \
-  rm -rf /tmp/staticcheck /tmp/staticcheck.tar.gz
-
-# osv-scanner
+# osv-scanner (scans Debian OS packages — not covered by govulncheck)
 RUN ARCH=$(dpkg --print-architecture) && \
   wget -q "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_${ARCH}" -O /usr/local/bin/osv-scanner && \
   chmod +x /usr/local/bin/osv-scanner
@@ -126,10 +113,9 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 RUN curl -fsSL https://claude.ai/install.sh | bash -s ${CLAUDE_CODE_VERSION}
 
 # Go tools
+# goimports, staticcheck, gosec are subsumed by golangci-lint v2
 RUN go install mvdan.cc/gofumpt@v${GOFUMPT_VERSION} && \
-  go install golang.org/x/tools/cmd/goimports@v${GOIMPORTS_VERSION} && \
   go install golang.org/x/vuln/cmd/govulncheck@v${GOVULNCHECK_VERSION} && \
-  go install github.com/securego/gosec/v2/cmd/gosec@v${GOSEC_VERSION} && \
   go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GOLANGCI_LINT_VERSION}
 
 # Firewall

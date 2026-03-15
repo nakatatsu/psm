@@ -9,13 +9,13 @@ description: >
 
 # check — Go 機械的チェック
 
-プロジェクトの Go コードに対してフォーマッタ・静的解析・リンタ・テストを実行する。
+プロジェクトの Go コードに対してフォーマッタ・リンタ・テストを実行する。
 
 ## 使い方
 
 | 呼び出し | 実行内容 |
 |---------|---------|
-| `/check` | フォーマッタ + 静的解析 + リンタ + ユニットテスト |
+| `/check` | フォーマッタ + リンタ + ユニットテスト |
 | `/check all` | 上記 + govulncheck |
 | `/check int` | AWS 統合テストのみ |
 | `/check vuln` | govulncheck のみ |
@@ -33,16 +33,11 @@ cd /workspace
 
 # 1. フォーマッタ
 gofumpt -l .
-goimports -l .
 
-# 2. 静的解析
-go vet ./...
-staticcheck ./...
-
-# 3. リンタ（gosec を内包）
+# 2. リンタ（govet, staticcheck, gosec, goimports, errcheck, ineffassign, unused を内包）
 golangci-lint run ./...
 
-# 4. ユニットテスト
+# 3. ユニットテスト
 go test ./...
 ```
 
@@ -54,9 +49,6 @@ go test ./...
 | チェック | 結果 |
 |---------|------|
 | gofumpt | ✅ OK / ❌ 要修正 |
-| goimports | ✅ OK / ❌ 要修正 |
-| go vet | ✅ OK / ❌ 要修正 |
-| staticcheck | ✅ OK / ❌ 要修正 |
 | golangci-lint | ✅ OK / ❌ 要修正 |
 | go test | ✅ OK / ❌ 失敗 |
 ```
@@ -95,6 +87,6 @@ govulncheck ./...
 
 ## 環境に関する注意
 
-- **golangci-lint** は gosec を内包。`.golangci.yml` で G703（パストラバーサル）と G705（XSS）を除外済み。CLI ツールなので該当しないため。
-- **staticcheck** は Dockerfile では GitHub Releases バイナリからインストール済み。Squid プロキシ経由で `go install` も利用可能。
+- **golangci-lint v2** は govet, staticcheck, gosec, goimports, errcheck, ineffassign, unused を内包。standalone の goimports, staticcheck, gosec は不要（Dockerfile からも削除済み）。
+- **golangci-lint** の設定は `.golangci.yml` を参照。gosec の G703（パストラバーサル）と G705（XSS）を除外済み（CLI ツールなので該当しない）。
 - **govulncheck** は `vuln.go.dev` への外部接続が必要。Squid プロキシ（outbound-filter）経由でアクセス可能。
