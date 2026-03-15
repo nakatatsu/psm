@@ -35,7 +35,7 @@
 |---|-----------|---------------|-------|
 | I | Simplicity First | Is this the simplest viable design? No unnecessary abstractions or dependencies? | |
 | II | YAGNI | Does every element serve a present, concrete need? No speculative features? | |
-| III | Test-First (NON-NEGOTIABLE) | Are all tests written before implementation (Red-Green cycle)? Using `go test` only? No third-party test frameworks? Stub/integration tests use DI (no test branches in production code)? | |
+| III | Test-First (NON-NEGOTIABLE) | Are all tests written before implementation (Red-Green cycle)? Using `go test` only? No third-party test frameworks? | |
 
 ## Project Structure
 
