@@ -1,7 +1,6 @@
 # Go toolchain
-.proxy.golang.org
-.sum.golang.org
-.vuln.go.dev
+# .golang.org covers proxy.golang.org, sum.golang.org etc.
+# .go.dev covers vuln.go.dev, pkg.go.dev etc.
 .go.dev
 .golang.org
 .storage.googleapis.com

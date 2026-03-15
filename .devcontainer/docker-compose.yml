@@ -37,6 +37,9 @@ services:
     build:
       context: ./gh-token-sidecar
       dockerfile: Dockerfile
+    depends_on:
+      outbound-filter:
+        condition: service_healthy
     volumes:
       - ${GH_APP_PEM_PATH}:/secrets/private-key.pem:ro
     environment:
