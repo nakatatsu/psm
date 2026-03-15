@@ -1,5 +1,5 @@
 ---
-description: Execute the implementation planning workflow to produce design artifacts -- research.md, data-model.md, contracts/, and quickstart.md. Use this after a spec is written and the user wants to move from requirements to technical design.
+description: Execute the implementation planning workflow using the plan template to generate design artifacts. Produces research.md, data-model.md, contracts/, and quickstart.md. Use this after a spec is written (and optionally after /speckit.survey) and the user wants to move from requirements to technical design.
 ---
 
 ## User Input
@@ -12,29 +12,32 @@ Consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. **Setup**: Run `.specify/scripts/bash/setup-plan.sh --json` from repo root and parse the JSON output for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, and BRANCH. Use absolute paths throughout. For single quotes in args, use: `"I'm Groot"` (double-quote) or `'I'\''m Groot'` (escape).
+1. **Setup**: Run `.specify/scripts/bash/setup-plan.sh --json` from repo root and parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH. Use absolute paths throughout. For single quotes in args, use: `"I'm Groot"` (double-quote) or `'I'\''m Groot'` (escape).
 
-2. **Load context**: Read FEATURE_SPEC and `.specify/memory/constitution.md`. Load the IMPL_PLAN template (already copied by the setup script).
+2. **Load context**: Read FEATURE_SPEC and `.specify/memory/constitution.md`. Load IMPL_PLAN template (already copied). If `SPECS_DIR/survey.md` exists, read it as additional context for Phase 0.
 
-3. **Execute the plan workflow** following the IMPL_PLAN template structure:
-   - Fill Technical Context, marking unknowns as "NEEDS CLARIFICATION".
-   - Fill the Constitution Check section from the constitution.
-   - Evaluate gates -- ERROR if violations are unjustified.
-   - Phase 0: generate research.md (resolve all NEEDS CLARIFICATION items).
-   - Phase 1: generate data-model.md, contracts/, and quickstart.md.
-   - Phase 1: update agent context by running the agent script.
-   - Re-evaluate the Constitution Check post-design.
+3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
+   - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
+   - Fill Constitution Check section from constitution
+   - Evaluate gates (ERROR if violations unjustified)
+   - Phase 0: Generate research.md (resolve all NEEDS CLARIFICATION)
+   - Phase 1: Generate data-model.md, contracts/, quickstart.md
+   - Phase 1: Update agent context by running the agent script
+   - Re-evaluate Constitution Check post-design
 
-4. **Stop and report**: This command ends after Phase 1 planning. Report the branch, IMPL_PLAN path, and all generated artifacts.
+4. **Stop and report**: Command ends after Phase 1 planning. Report branch, IMPL_PLAN path, and generated artifacts.
 
-## Phase 0: Outline and Research
+## Phases
 
-1. **Extract unknowns** from Technical Context:
-   - Each NEEDS CLARIFICATION item becomes a research task.
-   - Each dependency becomes a best-practices task.
-   - Each integration becomes a patterns task.
+### Phase 0: Outline & Research
 
-2. **Generate and dispatch research tasks**:
+1. **Extract unknowns from Technical Context** above:
+   - For each NEEDS CLARIFICATION → research task
+   - For each dependency → best practices task
+   - For each integration → patterns task
+
+2. **Generate and dispatch research agents**:
+
    ```text
    For each unknown in Technical Context:
      Task: "Research {unknown} for {feature context}"
@@ -42,32 +45,39 @@ Consider the user input before proceeding (if not empty).
      Task: "Find best practices for {tech} in {domain}"
    ```
 
-3. **Consolidate findings** in `research.md`:
-   - Decision: what was chosen
-   - Rationale: why it was chosen
-   - Alternatives considered: what else was evaluated
+3. **Consolidate findings** in `research.md` using format:
+   - Decision: [what was chosen]
+   - Rationale: [why chosen]
+   - Alternatives considered: [what else evaluated]
 
-Output: research.md with all NEEDS CLARIFICATION items resolved.
+**Output**: research.md with all NEEDS CLARIFICATION resolved
 
-## Phase 1: Design and Contracts
+### Phase 1: Design & Contracts
 
-Prerequisites: research.md is complete.
+**Prerequisites:** `research.md` complete
 
-1. **Extract entities from feature spec** into `data-model.md`:
+1. **Extract entities from feature spec** → `data-model.md`:
    - Entity name, fields, relationships
-   - Validation rules derived from requirements
+   - Validation rules from requirements
    - State transitions if applicable
 
-2. **Define interface contracts** (if the project has external interfaces) in `/contracts/`:
-   - Identify what interfaces the project exposes to users or other systems.
-   - Document contracts in the format appropriate for the project type: public APIs for libraries, command schemas for CLI tools, endpoints for web services, grammars for parsers, UI contracts for applications.
-   - Skip this step if the project is purely internal (build scripts, one-off tools, etc.).
+2. **Define interface contracts** (if project has external interfaces) → `/contracts/`:
+   - Identify what interfaces the project exposes to users or other systems
+   - Document the contract format appropriate for the project type
+   - Examples: public APIs for libraries, command schemas for CLI tools, endpoints for web services, grammars for parsers, UI contracts for applications
+   - Skip if project is purely internal (build scripts, one-off tools, etc.)
 
-3. **Update agent context**:
-   - Run `.specify/scripts/bash/update-agent-context.sh claude`.
-   - The script detects the AI agent in use and updates the appropriate context file.
-   - Add only new technology from the current plan; preserve manual additions between markers.
+3. **Agent context update**:
+   - Run `.specify/scripts/bash/update-agent-context.sh claude`
+   - These scripts detect which AI agent is in use
+   - Update the appropriate agent-specific context file
+   - Add only new technology from current plan
+   - Preserve manual additions between markers
 
-Output: data-model.md, /contracts/*, quickstart.md, agent-specific context file.
+**Output**: data-model.md, /contracts/*, quickstart.md, agent-specific file
 
-ERROR on any gate failures or unresolved clarifications that remain after research.
+## Key rules
+
+- Use absolute paths
+- ERROR on gate failures or unresolved clarifications
+- If survey.md exists, use its findings to inform Phase 0 research (avoid duplicating work)
