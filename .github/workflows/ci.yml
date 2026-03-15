@@ -27,10 +27,17 @@ jobs:
 
       # Covers: go vet, staticcheck, gosec, goimports, errcheck, ineffassign, unused
       # Config: .golangci.yml
-      - name: Lint
+      - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11.3
+          install-only: true
+
+      - name: Show enabled linters
+        run: golangci-lint linters | grep '^Enabled' -A 20
+
+      - name: Lint
+        run: golangci-lint run ./...
 
       - name: Test
         run: go test -race ./...
