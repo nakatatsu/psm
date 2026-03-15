@@ -1,10 +1,8 @@
 # workspace Development Guidelines
 
-## MANDATORY
+## Important
 
-NEVER RUN `sudo /usr/local/bin/init-firewall.sh`! IT DESTROY SESSION!
-
-Always save `.claude/` files (skills, settings, etc.) in the repository (`/workspace/.claude/`), never in `~/.claude/`. Files in `~/.claude/` are lost when the container is destroyed.
+- Always save `.claude/` files (skills, settings, etc.) in the repository (`/workspace/.claude/`), never in `~/.claude/`.
 
 ## Active Technologies
 
