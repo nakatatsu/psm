@@ -71,7 +71,7 @@ go test ./...
 govulncheck ./...
 ```
 
-govulncheck は `vuln.go.dev` への外部接続が必要。ファイアウォール環境ではタイムアウトする可能性がある。失敗した場合はネットワーク制約の可能性を伝える。
+govulncheck は `vuln.go.dev` への外部接続が必要。Squid プロキシ経由でアクセス可能。
 
 ### `/check int`
 
@@ -96,5 +96,5 @@ govulncheck ./...
 ## 環境に関する注意
 
 - **golangci-lint** は gosec を内包。`.golangci.yml` で G703（パストラバーサル）と G705（XSS）を除外済み。CLI ツールなので該当しないため。
-- **staticcheck** は `proxy.golang.org` がブロックされる環境のため GitHub Releases バイナリからインストール済み（Dockerfile に組み込み）。
-- **govulncheck** は `vuln.go.dev` への外部接続が必要。DevContainer のファイアウォール環境では実行不可の場合がある。
+- **staticcheck** は Dockerfile では GitHub Releases バイナリからインストール済み。Squid プロキシ経由で `go install` も利用可能。
+- **govulncheck** は `vuln.go.dev` への外部接続が必要。Squid プロキシ（outbound-filter）経由でアクセス可能。
