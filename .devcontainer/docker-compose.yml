@@ -57,7 +57,7 @@ services:
       context: ./outbound-filter
       dockerfile: Dockerfile
     healthcheck:
-      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "-x", "http://localhost:3128", "http://proxy.golang.org"]
+      test: ["CMD", "squidclient", "-h", "localhost", "-p", "3128", "mgr:info"]
       interval: 10s
       timeout: 5s
       retries: 3
