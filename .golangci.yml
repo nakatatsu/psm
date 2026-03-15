@@ -1,5 +1,14 @@
 version: "2"
 
+# v2 default preset "standard" is implicit and includes:
+#   govet (= go vet), staticcheck (+ gosimple + stylecheck),
+#   errcheck, ineffassign, unused
+# "enable" below adds ON TOP of the default — not the full list.
+
+formatters:
+  enable:
+    - goimports
+
 linters:
   enable:
     - gosec
