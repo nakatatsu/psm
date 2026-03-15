@@ -19,6 +19,9 @@ services:
       NODE_OPTIONS: "--max-old-space-size=4096"
       CLAUDE_CONFIG_DIR: /home/node/.claude
       POWERLEVEL9K_DISABLE_GITSTATUS: "true"
+      HTTP_PROXY: http://outbound-filter:3128
+      HTTPS_PROXY: http://outbound-filter:3128
+      NO_PROXY: localhost,127.0.0.1,gh-token-sidecar
       AWS_SANDBOX_SSO_START_URL: ${AWS_SANDBOX_SSO_START_URL:-}
       AWS_SANDBOX_SSO_ACCOUNT_ID: ${AWS_SANDBOX_SSO_ACCOUNT_ID:-}
       AWS_SSO_ROLE_NAME: ai-agent
@@ -26,6 +29,8 @@ services:
     command: sleep infinity
     depends_on:
       gh-token-sidecar:
+        condition: service_healthy
+      outbound-filter:
         condition: service_healthy
 
   gh-token-sidecar:
@@ -46,6 +51,18 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+  outbound-filter:
+    build:
+      context: ./outbound-filter
+      dockerfile: Dockerfile
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "-x", "http://localhost:3128", "http://proxy.golang.org"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   claude-code-bashhistory:

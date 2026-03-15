@@ -2,17 +2,23 @@
 set -euo pipefail  # Exit on error, undefined vars, and pipeline failures
 IFS=$'\n\t'       # Stricter word splitting
 
+# ==========================================================================
+# Egress control strategy:
+#   - iptables allows ONLY Squid proxy (domain-based filtering)
+#   - Squid controls which domains are reachable (allowed-domains.txt)
+#   - No more IP-based allowlisting — no dig/ipset needed
+# ==========================================================================
+
 # 1. Extract Docker DNS info BEFORE any flushing
 DOCKER_DNS_RULES=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
 
-# Flush existing rules and delete existing ipsets
+# Flush existing rules
 iptables -F
 iptables -X
 iptables -t nat -F
 iptables -t nat -X
 iptables -t mangle -F
 iptables -t mangle -X
-ipset destroy allowed-domains 2>/dev/null || true
 
 # 2. Selectively restore ONLY internal Docker DNS resolution
 if [ -n "$DOCKER_DNS_RULES" ]; then
@@ -24,138 +30,82 @@ else
     echo "No Docker DNS rules to restore"
 fi
 
-# First allow DNS and localhost before any restrictions
-# Allow outbound DNS
+# Allow outbound DNS (needed for Docker internal DNS)
 iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-# Allow inbound DNS responses
 iptables -A INPUT -p udp --sport 53 -j ACCEPT
+
 # Allow outbound SSH
 iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
-# Allow inbound SSH responses
 iptables -A INPUT -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+
 # Allow localhost
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A OUTPUT -o lo -j ACCEPT
 
-# Create ipset with CIDR support
-ipset create allowed-domains hash:net
-
-# Fetch GitHub meta information and aggregate + add their IP ranges
-echo "Fetching GitHub IP ranges..."
-gh_ranges=$(curl -s https://api.github.com/meta)
-if [ -z "$gh_ranges" ]; then
-    echo "ERROR: Failed to fetch GitHub IP ranges"
+# Allow Squid proxy — all domain-based egress control is delegated to Squid
+SQUID_IP=$(getent hosts outbound-filter | awk '{print $1}')
+if [ -z "$SQUID_IP" ]; then
+    echo "ERROR: Failed to resolve outbound-filter container IP"
     exit 1
 fi
+echo "Squid proxy at: $SQUID_IP:3128"
+iptables -A OUTPUT -d "$SQUID_IP" -p tcp --dport 3128 -j ACCEPT
 
-if ! echo "$gh_ranges" | jq -e '.web and .api and .git' >/dev/null; then
-    echo "ERROR: GitHub API response missing required fields"
-    exit 1
-fi
-
-echo "Processing GitHub IPs..."
-while read -r cidr; do
-    if [[ ! "$cidr" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
-        echo "ERROR: Invalid CIDR range from GitHub meta: $cidr"
-        exit 1
-    fi
-    echo "Adding GitHub range $cidr"
-    ipset add allowed-domains "$cidr" -exist
-done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git)[]' | aggregate -q)
-
-# Resolve and add other allowed domains
-for domain in \
-    "proxy.golang.org" \
-    "sum.golang.org" \
-    "vuln.go.dev" \
-    "storage.googleapis.com" \
-    "registry.npmjs.org" \
-    "api.anthropic.com" \
-    "sentry.io" \
-    "statsig.anthropic.com" \
-    "statsig.com" \
-    "marketplace.visualstudio.com" \
-    "vscode.blob.core.windows.net" \
-    "update.code.visualstudio.com"; do
-    echo "Resolving $domain..."
-    ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
-    if [ -z "$ips" ]; then
-        echo "WARNING: Failed to resolve $domain (may be temporarily unavailable)"
-        continue
-    fi
-
-    while read -r ip; do
-        if [[ ! "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            echo "ERROR: Invalid IP from DNS for $domain: $ip"
-            exit 1
-        fi
-        echo "Adding $ip for $domain"
-        ipset add allowed-domains "$ip" -exist
-    done < <(echo "$ips")
-done
-
-# ============================================================================
-# Add AWS ap-northeast-1 (Tokyo) IP ranges
-# ============================================================================
-echo "Fetching AWS IP ranges for ap-northeast-1 (Tokyo)..."
-aws_ranges=$(curl -s https://ip-ranges.amazonaws.com/ip-ranges.json)
-if [ -n "$aws_ranges" ]; then
-    echo "Processing AWS Tokyo IPs..."
-    aws_count=0
-    while read -r cidr; do
-        if [[ "$cidr" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
-            ipset add allowed-domains "$cidr" -exist
-            aws_count=$((aws_count + 1))
-        fi
-    done < <(echo "$aws_ranges" | jq -r '.prefixes[] | select(.region == "ap-northeast-1") | .ip_prefix' | aggregate -q | sort -u)
-    echo "Added $aws_count AWS Tokyo IP ranges"
+# Allow gh-token-sidecar (direct access, not proxied)
+GH_SIDECAR_IP=$(getent hosts gh-token-sidecar | awk '{print $1}')
+if [ -n "$GH_SIDECAR_IP" ]; then
+    echo "gh-token-sidecar at: $GH_SIDECAR_IP:80"
+    iptables -A OUTPUT -d "$GH_SIDECAR_IP" -p tcp --dport 80 -j ACCEPT
 else
-    echo "ERROR: Failed to fetch AWS IP ranges"
-    exit 1
+    echo "WARNING: Failed to resolve gh-token-sidecar (may not be running)"
 fi
 
-# Get host IP from default route
+# Allow host network (Docker host communication, e.g. VS Code remote)
 HOST_IP=$(ip route | grep default | cut -d" " -f3)
 if [ -z "$HOST_IP" ]; then
     echo "ERROR: Failed to detect host IP"
     exit 1
 fi
-
 HOST_NETWORK=$(echo "$HOST_IP" | sed "s/\.[0-9]*$/.0\/24/")
-echo "Host network detected as: $HOST_NETWORK"
-
-# Set up remaining iptables rules
+echo "Host network: $HOST_NETWORK"
 iptables -A INPUT -s "$HOST_NETWORK" -j ACCEPT
 iptables -A OUTPUT -d "$HOST_NETWORK" -j ACCEPT
 
-# Set default policies to DROP first
+# Set default policies to DROP
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
 iptables -P OUTPUT DROP
 
-# First allow established connections for already approved traffic
+# Allow established connections
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-# Then allow only specific outbound traffic to allowed domains
-iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
-
-# Explicitly REJECT all other outbound traffic for immediate feedback
+# Reject all other outbound traffic for immediate feedback
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
 echo "Firewall configuration complete"
 echo "Verifying firewall rules..."
+
+# 1. Direct access (bypassing proxy) should be blocked
 if curl --connect-timeout 5 https://example.com >/dev/null 2>&1; then
-    echo "ERROR: Firewall verification failed - was able to reach https://example.com"
+    echo "ERROR: Direct access to example.com should be blocked"
     exit 1
 else
-    echo "Firewall verification passed - unable to reach https://example.com as expected"
+    echo "PASS: Direct access blocked"
 fi
 
-# Verify GitHub API access
-if ! curl --connect-timeout 5 https://api.github.com/zen >/dev/null 2>&1; then
-    echo "ERROR: Firewall verification failed - unable to reach https://api.github.com"
+# 2. Proxy access to allowed domain should work
+if ! curl --connect-timeout 5 -x http://outbound-filter:3128 https://api.github.com/zen >/dev/null 2>&1; then
+    echo "ERROR: Proxy access to api.github.com failed"
     exit 1
 else
-    echo "Firewall verification passed - able to reach https://api.github.com as expected"
+    echo "PASS: Proxy access to allowed domain works"
+fi
+
+# 3. Proxy access to disallowed domain should be blocked
+if curl --connect-timeout 5 -x http://outbound-filter:3128 https://example.com >/dev/null 2>&1; then
+    echo "ERROR: Proxy should block example.com"
+    exit 1
+else
+    echo "PASS: Proxy correctly blocks disallowed domain"
 fi
