@@ -12,13 +12,12 @@ formatters:
 linters:
   enable:
     - gosec
-
-linters-settings:
-  gosec:
-    excludes:
-      # CLI tool: file paths come from user's own command-line arguments.
-      # The user IS the operator — path traversal is by design.
-      - G703
-      # CLI tool: output goes to terminal stdout/stderr, not to a browser.
-      # XSS is not applicable.
-      - G705
+  settings:
+    gosec:
+      excludes:
+        # CLI tool: file paths come from user's own command-line arguments.
+        # The user IS the operator — path traversal is by design.
+        - G703
+        # CLI tool: output goes to terminal stdout/stderr, not to a browser.
+        # XSS is not applicable.
+        - G705
