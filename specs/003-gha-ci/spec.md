@@ -29,17 +29,14 @@
 - **FR-001**: CI は main ブランチ向けの pull_request イベントで自動実行されなければならない
 - **FR-002**: CI は main ブランチへの push イベントで自動実行されなければならない（ブランチ保護により直接 push は禁止されているが、マージ後のチェックとして機能する）
 - **FR-003**: CI は Go 1.26.1 環境でコードをビルド（`go build ./...`）しなければならない
-- **FR-004**: CI は gofumpt によるフォーマットチェックを実行し、違反があれば失敗しなければならない
-- **FR-005**: CI は goimports による import 順序チェックを実行し、違反があれば失敗しなければならない
-- **FR-006**: CI は `go vet ./...` による静的解析を実行しなければならない
-- **FR-007**: CI は staticcheck による追加の静的解析を実行しなければならない
-- **FR-008**: CI は golangci-lint（gosec 含む）をプロジェクトの `.golangci.yml` 設定で実行しなければならない
-- **FR-009**: CI は govulncheck による依存ライブラリの脆弱性チェックを実行しなければならない
-- **FR-010**: CI は `go test -race` によるユニットテストを実行し、データ競合も検出しなければならない
-- **FR-011**: CI で使用するツールバージョンは DevContainer の Dockerfile と一致させなければならない（Go 1.26.1, gofumpt 0.9.2, goimports 0.42.0, golangci-lint 2.9.0, staticcheck 2026.1, govulncheck 1.1.4）
-- **FR-012**: CI はいずれかのステップが失敗した場合、全体として失敗ステータスを返さなければならない
-- **FR-013**: CI は AWS 統合テスト（`PSM_INTEGRATION_TEST=1` が必要なテスト）を実行してはならない
-- **FR-014**: CI ジョブ名は `ci` としなければならない（リポジトリの required status check `ci` と一致させるため）
+- **FR-004**: CI はフォーマットチェックを実行し、違反があれば失敗しなければならない
+- **FR-005**: CI は静的解析・リンタを実行しなければならない。ツール間の冗長を排除し、必要最小限の構成とすること（具体的なツール選定と冗長の整理は Plan で決定する）
+- **FR-006**: CI は脆弱性チェックを実行しなければならない。ただし外部サービス障害で PR マージが不当にブロックされないよう、実行方式（ブロッキング / non-blocking / scheduled）は Plan で決定する
+- **FR-007**: CI は `go test -race` によるユニットテストを実行し、データ競合も検出しなければならない
+- **FR-008**: CI で使用するツールバージョンのうち、フォーマッタはローカルと一致させなければならない（結果の不一致を防ぐため）。リンタ・脆弱性チェッカーのバージョン一致は必須ではない
+- **FR-009**: CI はいずれかのステップが失敗した場合、全体として失敗ステータスを返さなければならない
+- **FR-010**: CI は AWS 統合テスト（`PSM_INTEGRATION_TEST=1` が必要なテスト）を実行してはならない
+- **FR-011**: CI ジョブ名は `ci` としなければならない（リポジトリの required status check `ci` と一致させるため）
 
 ## Success Criteria _(mandatory)_
 
@@ -53,6 +50,6 @@
 
 - GitHub-hosted runner（`ubuntu-latest`）を使用する。Self-hosted runner は不要
 - AWS 統合テストはスコープ外。`PSM_INTEGRATION_TEST` 未設定により AWS 系テスト（ssm_test, sm_test）は自動 skip され、ロジック系テスト（yaml, sync, export, main）のみ実行される
-- ツールのインストールは `go install` で行う（DevContainer も Squid プロキシ導入済みで同様に可能）
+- ツールの選定・インストール方式・冗長の整理は Plan で決定する（survey で golangci-lint がvet/staticcheck/gosec を内包する可能性を指摘済み）
 - 単一ジョブ構成とする（ステップ数が少なく、ジョブ分割のオーバーヘッドが見合わない）
 - main ブランチ保護（直接 push 禁止、required status check `ci`）は設定済み。本フィーチャーではワークフロー定義のみが対象

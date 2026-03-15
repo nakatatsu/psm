@@ -1,15 +1,23 @@
 version: "2"
 
+# v2 default preset "standard" is implicit and includes:
+#   govet (= go vet), staticcheck (+ gosimple + stylecheck),
+#   errcheck, ineffassign, unused
+# "enable" below adds ON TOP of the default — not the full list.
+
+formatters:
+  enable:
+    - goimports
+
 linters:
   enable:
     - gosec
-
-linters-settings:
-  gosec:
-    excludes:
-      # CLI tool: file paths come from user's own command-line arguments.
-      # The user IS the operator — path traversal is by design.
-      - G703
-      # CLI tool: output goes to terminal stdout/stderr, not to a browser.
-      # XSS is not applicable.
-      - G705
+  settings:
+    gosec:
+      excludes:
+        # CLI tool: file paths come from user's own command-line arguments.
+        # The user IS the operator — path traversal is by design.
+        - G703
+        # CLI tool: output goes to terminal stdout/stderr, not to a browser.
+        # XSS is not applicable.
+        - G705
