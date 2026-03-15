@@ -1,0 +1,118 @@
+package main
+
+import (
+	"testing"
+)
+
+func TestParseArgs(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		want    Config
+		wantErr bool
+	}{
+		{
+			name: "sync with ssm",
+			args: []string{"psm", "sync", "--store", "ssm", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "ssm", File: "file.yaml"},
+		},
+		{
+			name: "sync with sm and profile",
+			args: []string{"psm", "sync", "--store", "sm", "--profile", "prod", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "sm", Profile: "prod", File: "file.yaml"},
+		},
+		{
+			name: "sync with prune",
+			args: []string{"psm", "sync", "--store", "ssm", "--prune", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "ssm", Prune: true, File: "file.yaml"},
+		},
+		{
+			name: "sync with dry-run",
+			args: []string{"psm", "sync", "--store", "ssm", "--dry-run", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "ssm", DryRun: true, File: "file.yaml"},
+		},
+		{
+			name: "sync with prune and dry-run",
+			args: []string{"psm", "sync", "--store", "ssm", "--prune", "--dry-run", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "ssm", Prune: true, DryRun: true, File: "file.yaml"},
+		},
+		{
+			name: "export with ssm",
+			args: []string{"psm", "export", "--store", "ssm", "out.yaml"},
+			want: Config{Subcommand: "export", Store: "ssm", File: "out.yaml"},
+		},
+		{
+			name: "export with sm and profile",
+			args: []string{"psm", "export", "--store", "sm", "--profile", "staging", "out.yaml"},
+			want: Config{Subcommand: "export", Store: "sm", Profile: "staging", File: "out.yaml"},
+		},
+		{
+			name:    "no subcommand",
+			args:    []string{"psm"},
+			wantErr: true,
+		},
+		{
+			name:    "invalid subcommand",
+			args:    []string{"psm", "invalid"},
+			wantErr: true,
+		},
+		{
+			name:    "sync no store flag",
+			args:    []string{"psm", "sync", "file.yaml"},
+			wantErr: true,
+		},
+		{
+			name:    "sync invalid store value",
+			args:    []string{"psm", "sync", "--store", "dynamodb", "file.yaml"},
+			wantErr: true,
+		},
+		{
+			name:    "sync no file arg",
+			args:    []string{"psm", "sync", "--store", "ssm"},
+			wantErr: true,
+		},
+		{
+			name:    "export no file arg",
+			args:    []string{"psm", "export", "--store", "ssm"},
+			wantErr: true,
+		},
+		{
+			name:    "export no store flag",
+			args:    []string{"psm", "export", "out.yaml"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseArgs(tt.args)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.Subcommand != tt.want.Subcommand {
+				t.Errorf("Subcommand = %q, want %q", got.Subcommand, tt.want.Subcommand)
+			}
+			if got.Store != tt.want.Store {
+				t.Errorf("Store = %q, want %q", got.Store, tt.want.Store)
+			}
+			if got.Profile != tt.want.Profile {
+				t.Errorf("Profile = %q, want %q", got.Profile, tt.want.Profile)
+			}
+			if got.Prune != tt.want.Prune {
+				t.Errorf("Prune = %v, want %v", got.Prune, tt.want.Prune)
+			}
+			if got.DryRun != tt.want.DryRun {
+				t.Errorf("DryRun = %v, want %v", got.DryRun, tt.want.DryRun)
+			}
+			if got.File != tt.want.File {
+				t.Errorf("File = %q, want %q", got.File, tt.want.File)
+			}
+		})
+	}
+}
