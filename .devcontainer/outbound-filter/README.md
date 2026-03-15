@@ -40,8 +40,3 @@ outbound-filter (docker-compose 別サービス, Squid)
 | **Squid** | CONNECT プロキシとしてドメインベース制御が素直にできる。設定が簡潔で運用コストが低い |
 | Tinyproxy | 軽量だが HTTPS CONNECT の制御が簡素すぎる。検証環境向き                              |
 | Envoy     | 高機能だが設定が複雑。単純な許可リスト型プロキシには過剰                             |
-
-## 注意事項
-
-- **GOPROXY**: `GOPROXY=https://proxy.golang.org,direct` のまま、通信経路だけ Squid を通す形で動作する
-- **将来の拡張**: 社内 GOPROXY を立てれば、外部ドメインへの依存をさらに減らせる

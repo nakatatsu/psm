@@ -30,13 +30,9 @@ else
     echo "No Docker DNS rules to restore"
 fi
 
-# Allow outbound DNS (needed for Docker internal DNS)
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-iptables -A INPUT -p udp --sport 53 -j ACCEPT
-
-# Allow outbound SSH
-iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
-iptables -A INPUT -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+# Allow Docker internal DNS only (no external DNS — prevents DNS tunneling)
+iptables -A OUTPUT -d 127.0.0.11 -p udp --dport 53 -j ACCEPT
+iptables -A INPUT -s 127.0.0.11 -p udp --sport 53 -j ACCEPT
 
 # Allow localhost
 iptables -A INPUT -i lo -j ACCEPT
