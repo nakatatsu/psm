@@ -60,7 +60,7 @@ services:
       context: ./outbound-filter
       dockerfile: Dockerfile
     healthcheck:
-      test: ["CMD", "squidclient", "-h", "localhost", "-p", "3128", "mgr:info"]
+      test: ["CMD", "curl", "-so", "/dev/null", "http://localhost:3128/"]
       interval: 10s
       timeout: 5s
       retries: 3
