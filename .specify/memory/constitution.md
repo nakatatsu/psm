@@ -1,10 +1,7 @@
 <!--
-Sync Impact Report
-- Version change: 1.1.0 → 2.0.0
-- Modified principles:
-  - III. Test-First: Removed "free of external dependencies" blanket rule. Replaced with two-tier strategy (unit tests = no deps, integration tests = sandbox AWS). Mocks explicitly prohibited.
-- Renamed: gossm → psm
-- Follow-up TODOs: none
+Amendment Log
+- 1.1.0 → 2.0.0 (2026-03-09): III. Test-First: Removed "free of external dependencies" blanket rule. Replaced with two-tier strategy (unit tests = no deps, integration tests = sandbox AWS). Mocks explicitly prohibited. Renamed: gossm → psm.
+- 2.0.0 → 3.0.0 (2026-03-15): III. Test-First: Expanded to three-tier strategy. Added stub tests (AWS emulator e.g. moto) for CI. Real AWS remains authoritative source of truth. Test branches in production code prohibited; use DI.
 -->
 
 # psm Constitution
@@ -34,7 +31,9 @@ Sync Impact Report
 - Test files live alongside the code they test (`*_test.go` in the same package).
 - Table-driven tests are the preferred pattern where multiple inputs/outputs are exercised.
 - Unit tests (pure logic) must be deterministic and fast with no external dependencies.
-- Integration tests (AWS API etc.) use a sandbox environment with dedicated test prefixes and setup/teardown. Mocks are not used — the tool's value is in its interaction with real services.
+- Stub tests (for CI) use an AWS emulator (e.g., moto) running as a Docker service. Endpoint URL is injected via environment variable. Stub tests exercise the same Store implementations as real AWS but against the emulator. When behavioral differences between the stub and real AWS are discovered, real AWS is authoritative; differences are documented as known limitations.
+- Integration tests (real AWS) use a sandbox environment with dedicated test prefixes and setup/teardown. Real AWS is the authoritative source of truth.
+- Test branches in production code (e.g., `if test then ...`) are prohibited. Use dependency injection to switch between stub and real AWS.
 
 ## Technology Stack
 
@@ -71,4 +70,4 @@ Commits that violate this order (implementation without tests, proceeding to nex
 - Version follows semantic versioning: MAJOR for principle removals or redefinitions, MINOR for new principles or sections, PATCH for wording clarifications.
 - Compliance is verified during spec review (checklist gate) and plan review (Constitution Check section).
 
-**Version**: 2.0.0 | **Ratified**: 2026-03-08 | **Last Amended**: 2026-03-09
+**Version**: 3.0.0 | **Ratified**: 2026-03-08 | **Last Amended**: 2026-03-15
