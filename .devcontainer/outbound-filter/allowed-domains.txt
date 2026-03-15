@@ -1,0 +1,27 @@
+# Go toolchain
+# .golang.org covers proxy.golang.org, sum.golang.org etc.
+# .go.dev covers vuln.go.dev, pkg.go.dev etc.
+.go.dev
+.golang.org
+.storage.googleapis.com
+
+# Node / npm
+.registry.npmjs.org
+
+# Claude Code
+.anthropic.com
+.sentry.io
+.statsig.com
+
+# VS Code extensions
+.marketplace.visualstudio.com
+.vscode.blob.core.windows.net
+.update.code.visualstudio.com
+
+# GitHub
+.github.com
+.githubusercontent.com
+.github.io
+
+# AWS
+.amazonaws.com
