@@ -10,8 +10,12 @@
 
 # Claude Code
 .anthropic.com
+.claude.com                                                                                                                                                                    
+.claude.ai  
+
 .sentry.io
 .statsig.com
+
 
 # VS Code extensions
 .marketplace.visualstudio.com
