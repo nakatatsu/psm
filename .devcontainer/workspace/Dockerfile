@@ -118,6 +118,9 @@ RUN go install mvdan.cc/gofumpt@v${GOFUMPT_VERSION} && \
   go install golang.org/x/vuln/cmd/govulncheck@v${GOVULNCHECK_VERSION} && \
   go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GOLANGCI_LINT_VERSION}
 
+# Git: mark /workspace as safe (owner differs from remoteUser)
+RUN git config --global --add safe.directory /workspace
+
 # Firewall
 COPY init-firewall.sh /usr/local/bin/
 USER root
