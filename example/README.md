@@ -14,12 +14,12 @@ Manage AWS SSM Parameter Store secrets with [psm](https://github.com/nakatatsu/p
 
 Open this directory in VS Code and select **"Reopen in Container"**. The container includes:
 
-| Tool | Purpose | License |
-|------|---------|---------|
-| psm | Sync secrets to Parameter Store | MIT |
-| SOPS | Encrypt/decrypt secrets files | MPL 2.0 |
-| age | Encryption backend for SOPS | BSD 3-Clause |
-| AWS CLI v2 | AWS authentication and debugging | Apache 2.0 |
+| Tool       | Purpose                          | License      |
+| ---------- | -------------------------------- | ------------ |
+| psm        | Sync secrets to Parameter Store  | MIT          |
+| SOPS       | Encrypt/decrypt secrets files    | MPL 2.0      |
+| age        | Encryption backend for SOPS      | BSD 3-Clause |
+| AWS CLI v2 | AWS authentication and debugging | Apache 2.0   |
 
 ### 2. Generate an age key
 
@@ -68,6 +68,7 @@ aws configure sso --use-device-code
 ```
 
 Follow the prompts to set up your SSO session. You will need:
+
 - SSO start URL (e.g., `https://your-org.awsapps.com/start`)
 - SSO region
 - Account ID and role name
@@ -79,6 +80,10 @@ aws sso login --use-device-code --profile <your-profile>
 
 # if need
 export SOPS_AGE_KEY_FILE=$(pwd)/age-key.txt
+# Preview changes without applying
+sops -d secrets.enc.yaml | psm sync --store ssm --profile <your-profile> --dry-run /dev/stdin
+
+# Apply
 sops -d secrets.enc.yaml | psm sync --store ssm --profile <your-profile> /dev/stdin
 ```
 
@@ -104,28 +109,8 @@ test.sh              Manual verification commands
 
 Rebuild the DevContainer with custom versions:
 
-```jsonc
-// .devcontainer/devcontainer.json
-{
-  "build": {
-    "dockerfile": "Dockerfile",
-    "args": {
-      "PSM_VERSION": "0.1.0",
-      "SOPS_VERSION": "3.12.1",
-      "AGE_VERSION": "1.2.1",
-      "AWS_CLI_VERSION": "2.34.9"
-    }
-  }
-}
-```
-
-## Platform Support
-
-- linux/amd64
-- linux/arm64
-
 ## Notes
 
-- **Production environments should use AWS KMS instead of age keys.** KMS provides key rotation, IAM-based access control, and CloudTrail audit logging. With KMS, no key file distribution is needed.
+- Production environments should use AWS KMS instead of age keys.
 - age-key.txt must never be committed to the repository.
 - AWS configuration (`~/.aws`) is stored in a Docker named volume (`psm-aws-config`), independent of the host. Run `aws configure sso` once inside the container; the settings persist across rebuilds.
