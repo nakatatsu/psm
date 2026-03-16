@@ -49,6 +49,11 @@ func execute(ctx context.Context, actions []Action, s Store, dryRun bool, stdout
 	sem := make(chan struct{}, 10)
 	var wg sync.WaitGroup
 
+	prefix := ""
+	if dryRun {
+		prefix = "(dry-run) "
+	}
+
 	// Collect delete keys for batch operation
 	var deleteKeys []string
 
@@ -63,11 +68,11 @@ func execute(ctx context.Context, actions []Action, s Store, dryRun bool, stdout
 			if !dryRun {
 				continue // handle batch below
 			}
-			_, _ = fmt.Fprintf(stdout, "delete: %s\n", a.Key)
+			_, _ = fmt.Fprintf(stdout, "%sdelete: %s\n", prefix, a.Key)
 			summary.Deleted++
 			continue
 		case ActionCreate, ActionUpdate:
-			_, _ = fmt.Fprintf(stdout, "%s: %s\n", a.Type, a.Key)
+			_, _ = fmt.Fprintf(stdout, "%s%s: %s\n", prefix, a.Type, a.Key)
 			if dryRun {
 				if a.Type == ActionCreate {
 					summary.Created++
@@ -116,8 +121,12 @@ func execute(ctx context.Context, actions []Action, s Store, dryRun bool, stdout
 		}
 	}
 
-	_, _ = fmt.Fprintf(stdout, "%d created, %d updated, %d deleted, %d unchanged, %d failed\n",
-		summary.Created, summary.Updated, summary.Deleted, summary.Unchanged, summary.Failed)
+	suffix := ""
+	if dryRun {
+		suffix = " (dry-run)"
+	}
+	_, _ = fmt.Fprintf(stdout, "%d created, %d updated, %d deleted, %d unchanged, %d failed%s\n",
+		summary.Created, summary.Updated, summary.Deleted, summary.Unchanged, summary.Failed, suffix)
 
 	return summary
 }
