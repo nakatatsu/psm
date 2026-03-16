@@ -56,6 +56,46 @@ func TestExecuteDryRun(t *testing.T) {
 	if strings.Contains(out, "k3") {
 		t.Error("skip should not appear in output")
 	}
+
+	// dry-run indicator on action lines
+	if !strings.Contains(out, "(dry-run) create: k1") {
+		t.Errorf("dry-run action line missing (dry-run) prefix: %s", out)
+	}
+	if !strings.Contains(out, "(dry-run) update: k2") {
+		t.Errorf("dry-run action line missing (dry-run) prefix: %s", out)
+	}
+	// dry-run indicator on summary line
+	if !strings.Contains(out, "(dry-run)") || !strings.Contains(out, "created") {
+		t.Errorf("dry-run summary line missing (dry-run) indicator: %s", out)
+	}
+}
+
+func TestExecuteNoDryRunOutput(t *testing.T) {
+	fs := newFakeStore()
+	actions := []Action{
+		{Key: "k1", Type: ActionCreate, Value: "v1"},
+	}
+	var stdout, stderr bytes.Buffer
+	execute(context.Background(), actions, fs, false, &stdout, &stderr)
+
+	out := stdout.String()
+	if strings.Contains(out, "(dry-run)") {
+		t.Errorf("non-dry-run output should not contain (dry-run): %s", out)
+	}
+}
+
+func TestExecuteDryRunWithDelete(t *testing.T) {
+	fs := newFakeStore()
+	actions := []Action{
+		{Key: "k1", Type: ActionDelete},
+	}
+	var stdout, stderr bytes.Buffer
+	execute(context.Background(), actions, fs, true, &stdout, &stderr)
+
+	out := stdout.String()
+	if !strings.Contains(out, "(dry-run) delete: k1") {
+		t.Errorf("dry-run delete line missing (dry-run) prefix: %s", out)
+	}
 }
 
 func TestExecutePartialFailure(t *testing.T) {
