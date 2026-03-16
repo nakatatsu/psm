@@ -1,0 +1,9 @@
+# SOPS configuration for age encryption.
+#
+# Setup:
+#   1. Generate an age key:  age-keygen -o age-key.txt
+#   2. Copy the public key (age1...) from the output
+#   3. Replace the placeholder below with your public key
+#   4. Rename this file:  cp .sops.yaml.example .sops.yaml
+creation_rules:
+  - age: "age1your-public-key-here"
