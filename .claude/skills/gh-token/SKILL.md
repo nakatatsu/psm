@@ -1,48 +1,46 @@
 ---
 name: gh-token
 description: >
-  GitHub トークンを gh-token-sidecar コンテナ経由で取得・更新するスキル。
-  gh コマンドが認証エラー（401, 403, "auth required", "token expired", "bad credentials" 等）で
-  失敗した場合は、必ずこのスキルを使ってトークンを再取得すること。
-  gh auth, git push/pull/fetch, GitHub API 呼び出しなど GitHub 認証が絡む操作全般で
-  権限切れが疑われる場合にも自動的に利用せよ。
+  Retrieve GitHub tokens via the gh-token-sidecar container.
+  Use this skill whenever a gh command fails with an auth error (401, 403, "auth required",
+  "token expired", "bad credentials", etc.). Also use proactively before any GitHub auth
+  operation (gh auth, git push/pull/fetch, GitHub API calls) when token expiry is suspected.
 ---
 
-# gh-token トークン取得スキル
+# gh-token — Token Retrieval Skill
 
-このワークスペースでは GitHub App のインストールトークンを発行する
-サイドカーコンテナ (`gh-token-sidecar`) が稼働している。
-PAT は使わず、必ずこのサイドカー経由でトークンを取得する。
+This workspace uses a sidecar container (`gh-token-sidecar`) that issues GitHub App
+installation tokens. Always obtain tokens through this sidecar — never use a PAT.
 
-## トークン取得手順
+## How to Get a Token
 
 ```bash
 export GH_TOKEN=$(curl -sf http://gh-token-sidecar/token | jq -r '.token')
 ```
 
-取得後、同じシェルセッション内で `gh` コマンドや GitHub API を利用できる。
+After export, `gh` CLI and GitHub API calls in the same shell session will use this token automatically.
 
-## サイドカーが応答しない場合
+## If the Sidecar Is Unresponsive
 
-ヘルスチェックで生死を確認する:
+Check health:
 
 ```bash
 curl -sf http://gh-token-sidecar/health
 ```
 
-応答がなければサイドカーコンテナが停止している可能性がある。
-ユーザーに「gh-token-sidecar コンテナが応答しません。`docker compose up gh-token-sidecar` で起動してください」と伝える。
+If no response, the sidecar container is likely stopped. Tell the user:
+"gh-token-sidecar is not responding. Please run `docker compose up gh-token-sidecar` to start it."
 
-## 重要な注意点
+## Important Notes
 
-- トークンはリクエストごとに新規発行される（キャッシュなし）ので、期限切れを心配する必要はない。呼べば常に新鮮なトークンが返る。
-- `GH_TOKEN` 環境変数にセットすれば `gh` CLI が自動的にそれを使う。`gh auth login` は不要。
-- `.pem` 秘密鍵はサイドカーコンテナ内にのみ存在し、このコンテナからは一切アクセスできない。鍵を探したり読もうとしないこと。
+- Tokens are freshly issued per request (no caching), so expiry is never a concern — just call the endpoint.
+- Setting `GH_TOKEN` is enough — `gh auth login` is not needed.
+- The `.pem` private key exists only inside the sidecar container and is inaccessible from this container. Do not attempt to find or read it.
 
-## いつ使うか
+## When to Use
 
-1. `gh` コマンドが認証エラーで失敗したとき（最も典型的なケース）
-2. 新しいシェルセッションを開始して GitHub 操作を行う前
-3. トークンが失効した可能性があるとき（長時間経過後など）
+1. A `gh` command fails with an auth error (most common case)
+2. Before GitHub operations in a new shell session
+3. When a token may have expired (after a long gap)
 
-認証エラーを検知したら、まずこのスキルでトークンを再取得し、それからコマンドをリトライする。
+On auth error, retrieve a fresh token with this skill first, then retry the command.
