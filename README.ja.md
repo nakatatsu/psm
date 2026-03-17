@@ -4,7 +4,7 @@
 
 YAML ファイルを AWS SSM Parameter Store / Secrets Manager に同期するツール。
 
-[English](README.md)
+> 本書は [README.md](README.md) の日本語訳です。情報が古い可能性があるため、最新の情報は英語版を参照してください。
 
 ## インストール
 
