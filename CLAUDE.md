@@ -11,6 +11,7 @@
 ## Active Technologies
 - N/A（Go コードなし。Dockerfile + 設定ファイルのみ） + psm (GitHub Releases), SOPS v3.12.1, age v1.2.1, AWS CLI v2.34.9 (007-docker)
 - Go 1.26 + 標準ライブラリのみ（fmt, io） (008-dryrun-output)
+- N/A（Markdown プロンプトの変更のみ） + `gh` CLI（GitHub API アクセス）、`create-new-feature.sh`（既存スクリプト） (016-sync-issue-numbers)
 
 ## Recent Changes
 - 007-docker: Added N/A（Go コードなし。Dockerfile + 設定ファイルのみ） + psm (GitHub Releases), SOPS v3.12.1, age v1.2.1, AWS CLI v2.34.9
