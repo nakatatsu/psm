@@ -6,6 +6,7 @@
 .storage.googleapis.com
 
 # Node / npm
+.nodejs.org
 .registry.npmjs.org
 
 # Claude Code
@@ -16,6 +17,10 @@
 .sentry.io
 .statsig.com
 
+
+# OpenAI (Codex CLI)
+.openai.com
+.chatgpt.com
 
 # VS Code extensions
 .marketplace.visualstudio.com

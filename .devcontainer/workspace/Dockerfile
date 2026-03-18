@@ -12,6 +12,8 @@ ARG GOFUMPT_VERSION=0.9.2
 ARG GOLANGCI_LINT_VERSION=2.11.3
 ARG GOVULNCHECK_VERSION=1.1.4
 ARG OSV_SCANNER_VERSION=2.3.3
+ARG NODE_VERSION=22.17.0
+ARG CODEX_VERSION=latest
 ARG GIT_DELTA_VERSION=0.18.2
 ARG ZSH_IN_DOCKER_VERSION=1.2.0
 
@@ -76,6 +78,13 @@ RUN ARCH=$(dpkg --print-architecture) && \
   wget -q "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_${ARCH}" -O /usr/local/bin/osv-scanner && \
   chmod +x /usr/local/bin/osv-scanner
 
+# Node.js (required for Codex CLI)
+RUN ARCH=$(dpkg --print-architecture) && \
+  if [ "$ARCH" = "amd64" ]; then NODE_ARCH="x64"; else NODE_ARCH="$ARCH"; fi && \
+  wget -q "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" && \
+  tar -xzf "node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" -C /usr/local --strip-components=1 && \
+  rm "node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz"
+
 # git-delta
 RUN ARCH=$(dpkg --print-architecture) && \
   wget -q "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
@@ -111,6 +120,9 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 
 # Claude Code (native installer, no Node.js required)
 RUN curl -fsSL https://claude.ai/install.sh | bash -s ${CLAUDE_CODE_VERSION}
+
+# Codex CLI
+RUN npm install -g @openai/codex@${CODEX_VERSION}
 
 # Go tools
 # goimports, staticcheck, gosec are subsumed by golangci-lint v2

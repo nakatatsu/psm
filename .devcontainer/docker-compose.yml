@@ -26,6 +26,7 @@ services:
       AWS_SANDBOX_SSO_ACCOUNT_ID: ${AWS_SANDBOX_SSO_ACCOUNT_ID:-}
       AWS_SSO_ROLE_NAME: ai-agent
       AWS_SSO_REGION: ap-northeast-1
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     command: sleep infinity
     depends_on:
       gh-token-sidecar:
