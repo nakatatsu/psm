@@ -188,7 +188,7 @@ func TestSMSyncExecute(t *testing.T) {
 	actions := plan(entries, existing)
 
 	var stdout, stderr bytes.Buffer
-	summary := execute(ctx, actions, store, false, &stdout, &stderr)
+	summary := execute(ctx, actions, store, &stdout, &stderr)
 
 	if summary.Created != 1 {
 		t.Errorf("created = %d, want 1", summary.Created)

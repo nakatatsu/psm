@@ -74,17 +74,12 @@ func promptApprove(reader io.Reader, writer io.Writer) bool {
 	return input == "y" || input == "Y"
 }
 
-// execute runs planned actions against the store.
-func execute(ctx context.Context, actions []Action, s Store, dryRun bool, stdout, stderr io.Writer) Summary {
+// execute runs planned actions against the store. Display is handled by displayPlan before calling this.
+func execute(ctx context.Context, actions []Action, s Store, stdout, stderr io.Writer) Summary {
 	var summary Summary
 	var mu sync.Mutex
 	sem := make(chan struct{}, 10)
 	var wg sync.WaitGroup
-
-	prefix := ""
-	if dryRun {
-		prefix = "(dry-run) "
-	}
 
 	// Collect delete keys for batch operation
 	var deleteKeys []string
@@ -97,22 +92,9 @@ func execute(ctx context.Context, actions []Action, s Store, dryRun bool, stdout
 			continue
 		case ActionDelete:
 			deleteKeys = append(deleteKeys, a.Key)
-			if !dryRun {
-				continue // handle batch below
-			}
-			_, _ = fmt.Fprintf(stdout, "%sdelete: %s\n", prefix, a.Key)
-			summary.Deleted++
 			continue
 		case ActionCreate, ActionUpdate:
-			_, _ = fmt.Fprintf(stdout, "%s%s: %s\n", prefix, a.Type, a.Key)
-			if dryRun {
-				if a.Type == ActionCreate {
-					summary.Created++
-				} else {
-					summary.Updated++
-				}
-				continue
-			}
+			// Put operations run concurrently
 		}
 
 		wg.Add(1)
@@ -138,10 +120,7 @@ func execute(ctx context.Context, actions []Action, s Store, dryRun bool, stdout
 	wg.Wait()
 
 	// Handle deletes
-	if !dryRun && len(deleteKeys) > 0 {
-		for _, k := range deleteKeys {
-			_, _ = fmt.Fprintf(stdout, "delete: %s\n", k)
-		}
+	if len(deleteKeys) > 0 {
 		err := s.Delete(ctx, deleteKeys)
 		if err != nil {
 			summary.Failed += len(deleteKeys)
@@ -153,12 +132,8 @@ func execute(ctx context.Context, actions []Action, s Store, dryRun bool, stdout
 		}
 	}
 
-	suffix := ""
-	if dryRun {
-		suffix = " (dry-run)"
-	}
-	_, _ = fmt.Fprintf(stdout, "%d created, %d updated, %d deleted, %d unchanged, %d failed%s\n",
-		summary.Created, summary.Updated, summary.Deleted, summary.Unchanged, summary.Failed, suffix)
+	_, _ = fmt.Fprintf(stdout, "%d created, %d updated, %d deleted, %d unchanged, %d failed\n",
+		summary.Created, summary.Updated, summary.Deleted, summary.Unchanged, summary.Failed)
 
 	return summary
 }

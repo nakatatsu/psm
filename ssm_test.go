@@ -206,11 +206,17 @@ func TestSSMDryRun(t *testing.T) {
 	}
 	existing, _ := store.GetAll(ctx)
 	actions := plan(entries, existing)
-	var stdout, stderr bytes.Buffer
-	summary := execute(ctx, actions, store, true, &stdout, &stderr)
+	var stdout bytes.Buffer
+	// Dry-run: display plan and summary without executing
+	displayPlan(actions, &stdout)
+	printSummary(actions, true, &stdout)
 
-	if summary.Failed != 0 {
-		t.Errorf("failed = %d, want 0", summary.Failed)
+	out := stdout.String()
+	if !strings.Contains(out, "create:") || !strings.Contains(out, "update:") {
+		t.Errorf("dry-run output missing action lines: %s", out)
+	}
+	if !strings.Contains(out, "(dry-run)") {
+		t.Errorf("dry-run output missing indicator: %s", out)
 	}
 
 	// Verify AWS not changed (use GetParameter for strong consistency)
@@ -262,7 +268,7 @@ func TestSSMSyncExecute(t *testing.T) {
 	actions := plan(entries, existing)
 
 	var stdout, stderr bytes.Buffer
-	summary := execute(ctx, actions, store, false, &stdout, &stderr)
+	summary := execute(ctx, actions, store, &stdout, &stderr)
 
 	// Check summary
 	if summary.Created != 1 {

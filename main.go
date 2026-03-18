@@ -59,18 +59,16 @@ func run(cfg Config) (int, error) {
 		store = NewSMStore(awsCfg)
 	}
 
-	streams := &IOStreams{
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		IsTerminal: func() bool {
-			fi, err := os.Stdin.Stat()
-			return err == nil && fi.Mode()&os.ModeCharDevice != 0
-		},
-	}
-
 	switch cfg.Subcommand {
 	case "sync":
+		fi, _ := os.Stdin.Stat()
+		isTerminal := fi != nil && fi.Mode()&os.ModeCharDevice != 0
+		streams := &IOStreams{
+			Stdin:      os.Stdin,
+			Stdout:     os.Stdout,
+			Stderr:     os.Stderr,
+			IsTerminal: func() bool { return isTerminal },
+		}
 		return runSync(ctx, cfg, store, streams)
 	case "export":
 		return runExport(ctx, cfg, store)
@@ -164,7 +162,7 @@ func runSync(ctx context.Context, cfg Config, store Store, io *IOStreams) (int, 
 		}
 	}
 
-	summary := execute(ctx, actions, store, false, io.Stdout, io.Stderr)
+	summary := execute(ctx, actions, store, io.Stdout, io.Stderr)
 
 	if summary.Failed > 0 {
 		return 1, nil

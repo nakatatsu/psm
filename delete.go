@@ -28,31 +28,29 @@ func parseDeletePatterns(data []byte) ([]*regexp.Regexp, error) {
 	return compiled, nil
 }
 
+func matchesAny(key string, patterns []*regexp.Regexp) bool {
+	for _, re := range patterns {
+		if re.MatchString(key) {
+			slog.Debug("regex match", "pattern", re.String(), "key", key, "matched", true)
+			return true
+		}
+	}
+	return false
+}
+
 // planDeletes classifies existing AWS keys into delete candidates, conflicts, and unmanaged keys.
 // - deletes: keys matching any pattern AND not in yamlKeys
 // - conflicts: keys matching any pattern AND in yamlKeys (should abort)
 // - unmanaged: keys not in yamlKeys AND not matching any pattern (warning)
 func planDeletes(existing map[string]string, yamlKeys map[string]bool, patterns []*regexp.Regexp) (deletes []Action, conflicts []string, unmanaged []string) {
 	for k := range existing {
+		matched := matchesAny(k, patterns)
+
 		if yamlKeys[k] {
-			// Check if this YAML key matches any delete pattern (conflict)
-			for _, re := range patterns {
-				if re.MatchString(k) {
-					conflicts = append(conflicts, k)
-					break
-				}
+			if matched {
+				conflicts = append(conflicts, k)
 			}
 			continue
-		}
-
-		// Key not in YAML — check patterns
-		matched := false
-		for _, re := range patterns {
-			if re.MatchString(k) {
-				slog.Debug("regex match", "pattern", re.String(), "key", k, "matched", true)
-				matched = true
-				break
-			}
 		}
 
 		if matched {

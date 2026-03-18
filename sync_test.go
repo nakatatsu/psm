@@ -154,9 +154,6 @@ func TestRunSyncApproveFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// fakeStore with existing data
-	fs := newFakeStore()
-	fs.existing = map[string]string{"/app/key1": "oldval"}
 	ctx := context.Background()
 
 	t.Run("approve executes", func(t *testing.T) {
@@ -309,113 +306,59 @@ func TestDebugLogging(t *testing.T) {
 func TestConflictDetectionAbortsAll(t *testing.T) {
 	// If planDeletes returns conflicts, no operations should execute
 	fs := newFakeStore()
-	ctx := context.Background()
 
-	// Simulate: sync wants to create k1, but k2 is a conflict (in YAML + matches delete pattern)
 	entries := []Entry{{Key: "k1", Value: "v1"}, {Key: "k2", Value: "v2"}}
 	existing := map[string]string{"k2": "v2", "k3": "v3"}
 
-	syncActions := plan(entries, existing)
+	_ = plan(entries, existing)
 
 	yamlKeys := map[string]bool{"k1": true, "k2": true}
 	patterns := []*regexp.Regexp{regexp.MustCompile("k[23]")}
 	deletes, conflicts, _ := planDeletes(existing, yamlKeys, patterns)
 
-	// Conflicts should be detected
-	if len(conflicts) == 0 {
-		t.Fatal("expected conflicts, got none")
-	}
 	// k2 is in YAML and matches pattern → conflict
-	if conflicts[0] != "k2" {
-		t.Errorf("expected conflict on k2, got %q", conflicts[0])
+	if len(conflicts) != 1 || conflicts[0] != "k2" {
+		t.Errorf("expected conflict on k2, got %v", conflicts)
 	}
 
-	// With conflicts, we should NOT execute anything
-	// Verify by checking that if we did execute the sync actions, the store would be called
-	// But the point is: the caller (runSync) checks conflicts BEFORE calling execute
-	_ = syncActions
-	_ = deletes
-
-	// Verify store was never touched
-	if len(fs.puts) != 0 {
-		t.Error("store should not have been called when conflicts exist")
-	}
-
-	// Also verify that even the non-conflicting delete (k3) is in the deletes list
+	// Non-conflicting delete (k3) should still be in deletes
 	if len(deletes) != 1 || deletes[0].Key != "k3" {
 		t.Errorf("expected delete for k3, got %v", deletes)
 	}
 
-	// Execute should not be called — simulate what runSync does
-	summary := execute(ctx, syncActions, fs, false, &bytes.Buffer{}, &bytes.Buffer{})
-	// This is wrong behavior — in real code, execute is never called when conflicts exist
-	// We're just verifying the store interaction for completeness
-	_ = summary
+	// Store should never be touched when conflicts are detected
+	if len(fs.puts) != 0 {
+		t.Error("store should not have been called when conflicts exist")
+	}
 }
 
-func TestExecuteDryRun(t *testing.T) {
-	fs := newFakeStore()
+func TestDryRunFlow(t *testing.T) {
+	// Dry-run uses displayPlan + printSummary, not execute
 	actions := []Action{
 		{Key: "k1", Type: ActionCreate, Value: "v1"},
 		{Key: "k2", Type: ActionUpdate, Value: "v2"},
 		{Key: "k3", Type: ActionSkip},
+		{Key: "k4", Type: ActionDelete},
 	}
-	var stdout, stderr bytes.Buffer
-	summary := execute(context.Background(), actions, fs, true, &stdout, &stderr)
-
-	if summary.Created != 1 || summary.Updated != 1 || summary.Unchanged != 1 || summary.Failed != 0 {
-		t.Errorf("unexpected summary: %+v", summary)
-	}
-	if len(fs.puts) != 0 {
-		t.Error("dry-run should not call Put")
-	}
+	var stdout bytes.Buffer
+	displayPlan(actions, &stdout)
+	printSummary(actions, true, &stdout)
 
 	out := stdout.String()
-	if !strings.Contains(out, "create: k1") || !strings.Contains(out, "update: k2") {
-		t.Errorf("unexpected stdout: %s", out)
+	if !strings.Contains(out, "create: k1") {
+		t.Errorf("missing create line: %s", out)
+	}
+	if !strings.Contains(out, "update: k2") {
+		t.Errorf("missing update line: %s", out)
+	}
+	if !strings.Contains(out, "delete: k4") {
+		t.Errorf("missing delete line: %s", out)
 	}
 	if strings.Contains(out, "k3") {
 		t.Error("skip should not appear in output")
 	}
-
-	// dry-run indicator on action lines
-	if !strings.Contains(out, "(dry-run) create: k1") {
-		t.Errorf("dry-run action line missing (dry-run) prefix: %s", out)
-	}
-	if !strings.Contains(out, "(dry-run) update: k2") {
-		t.Errorf("dry-run action line missing (dry-run) prefix: %s", out)
-	}
-	// dry-run indicator on summary line
-	if !strings.Contains(out, "(dry-run)") || !strings.Contains(out, "created") {
-		t.Errorf("dry-run summary line missing (dry-run) indicator: %s", out)
-	}
-}
-
-func TestExecuteNoDryRunOutput(t *testing.T) {
-	fs := newFakeStore()
-	actions := []Action{
-		{Key: "k1", Type: ActionCreate, Value: "v1"},
-	}
-	var stdout, stderr bytes.Buffer
-	execute(context.Background(), actions, fs, false, &stdout, &stderr)
-
-	out := stdout.String()
-	if strings.Contains(out, "(dry-run)") {
-		t.Errorf("non-dry-run output should not contain (dry-run): %s", out)
-	}
-}
-
-func TestExecuteDryRunWithDelete(t *testing.T) {
-	fs := newFakeStore()
-	actions := []Action{
-		{Key: "k1", Type: ActionDelete},
-	}
-	var stdout, stderr bytes.Buffer
-	execute(context.Background(), actions, fs, true, &stdout, &stderr)
-
-	out := stdout.String()
-	if !strings.Contains(out, "(dry-run) delete: k1") {
-		t.Errorf("dry-run delete line missing (dry-run) prefix: %s", out)
+	if !strings.Contains(out, "(dry-run)") {
+		t.Errorf("summary missing (dry-run) indicator: %s", out)
 	}
 }
 
@@ -427,7 +370,7 @@ func TestExecutePartialFailure(t *testing.T) {
 		{Key: "k2", Type: ActionCreate, Value: "v2"},
 	}
 	var stdout, stderr bytes.Buffer
-	summary := execute(context.Background(), actions, fs, false, &stdout, &stderr)
+	summary := execute(context.Background(), actions, fs, &stdout, &stderr)
 
 	if summary.Created != 1 {
 		t.Errorf("created = %d, want 1", summary.Created)
