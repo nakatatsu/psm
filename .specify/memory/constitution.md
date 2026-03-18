@@ -1,9 +1,3 @@
-<!--
-Amendment Log
-- 1.1.0 → 2.0.0 (2026-03-09): III. Test-First: Removed "free of external dependencies" blanket rule. Replaced with two-tier strategy (unit tests = no deps, integration tests = sandbox AWS). Mocks explicitly prohibited. Renamed: gossm → psm.
-- 2.0.0 → 3.0.0 (2026-03-15): III. Test-First: Expanded to three-tier strategy. Added stub tests (AWS emulator e.g. moto) for CI. Real AWS remains authoritative source of truth. Test branches in production code prohibited; use DI.
--->
-
 # psm Constitution
 
 ## Core Principles
@@ -14,7 +8,7 @@ Amendment Log
 - No abstractions until a concrete, present need demands one. Three duplicated lines are preferable to a premature helper.
 - Flat package structure unless a package boundary is forced by a clear dependency cycle or API contract.
 - If a feature can be achieved with the standard library, do not introduce a third-party dependency.
-- Code must be readable without comments explaining *what* it does; comments are reserved for *why*.
+- Code must be readable without comments explaining _what_ it does; comments are reserved for _why_.
 
 ### II. YAGNI (You Aren't Gonna Need It)
 
@@ -51,7 +45,7 @@ Amendment Log
 - Each change should be a single, focused commit or PR that addresses one concern.
 - Run `go test ./...` and `go vet ./...` before every commit.
 - No generated code unless mandated by an external protocol (e.g., protobuf). If generated code is used, the generator invocation must be documented and reproducible.
-- Error handling follows Go conventions: return `error`, wrap with `fmt.Errorf("context: %w", err)`. Do not panic in library code.
+- Error handling follows Go conventions: return `error`, wrap with `fmt.Errorf("context: %w", err)`. Do not use `panic`.
 
 ### Implementation Order (NON-NEGOTIABLE)
 
@@ -70,4 +64,4 @@ Commits that violate this order (implementation without tests, proceeding to nex
 - Version follows semantic versioning: MAJOR for principle removals or redefinitions, MINOR for new principles or sections, PATCH for wording clarifications.
 - Compliance is verified during spec review (checklist gate) and plan review (Constitution Check section).
 
-**Version**: 3.0.0 | **Ratified**: 2026-03-08 | **Last Amended**: 2026-03-15
+**Version**: 3.0.1 | **Ratified**: 2026-03-08 | **Last Amended**: 2026-03-17
