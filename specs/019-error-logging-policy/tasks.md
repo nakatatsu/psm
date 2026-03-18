@@ -19,7 +19,7 @@
 
 **Purpose**: Prepare the document structure
 
-- [x] T001 Delete redundant documents/backend/coding-standard.md (research R6 — content is subset of deliverable)
+- [x] T001 Delete redundant documents/backend/coding-standard.md (research R6 — content is subset of deliverable; file was never git-tracked, deleted locally)
 
 ---
 

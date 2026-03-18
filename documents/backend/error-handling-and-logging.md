@@ -1,6 +1,6 @@
 # Error Handling and Logging
 
-This document defines the error handling and logging policy for the psm project. It extends the [psm Constitution](.specify/memory/constitution.md) (v3.0.0, line 54) with operational details.
+This document defines the error handling and logging policy for the psm project. It extends the [psm Constitution](.specify/memory/constitution.md) (v3.0.1, line 48) with operational details.
 
 ## Error Handling
 

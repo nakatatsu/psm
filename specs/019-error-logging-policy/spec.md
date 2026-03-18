@@ -87,6 +87,6 @@ A developer working on CLI output (diff lines, summaries, approve prompts) needs
 ## Assumptions
 
 - This project is a CLI tool, not a web server. The policy is tailored accordingly (no HTTP status codes, no request-scoped logging).
-- The policy applies to the `psm` codebase only. The existing `documents/backend/coding-standard.md` may reference this policy but is not updated in this issue.
+- The policy applies to the `psm` codebase only. `documents/backend/coding-standard.md` is deleted as redundant (its content is a subset of this policy document).
 - Key paths (e.g., `/myapp/prod/API_KEY`) are not considered sensitive data — only the values stored at those keys are sensitive.
 - The policy will be enforced by code review and AI agent compliance, not by automated tooling (linters, etc.) in this issue.
