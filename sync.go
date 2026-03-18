@@ -108,7 +108,7 @@ func execute(ctx context.Context, actions []Action, s Store, stdout, stderr io.W
 			if err != nil {
 				action.Error = err
 				summary.Failed++
-				_, _ = fmt.Fprintf(stderr, "error: %s: %v\n", action.Key, err)
+				fmt.Fprintf(stderr, "error: %s: %v\n", action.Key, err)
 			} else if action.Type == ActionCreate {
 				summary.Created++
 			} else {
@@ -125,14 +125,14 @@ func execute(ctx context.Context, actions []Action, s Store, stdout, stderr io.W
 		if err != nil {
 			summary.Failed += len(deleteKeys)
 			for _, k := range deleteKeys {
-				_, _ = fmt.Fprintf(stderr, "error: %s: %v\n", k, err)
+				fmt.Fprintf(stderr, "error: %s: %v\n", k, err)
 			}
 		} else {
 			summary.Deleted += len(deleteKeys)
 		}
 	}
 
-	_, _ = fmt.Fprintf(stdout, "%d created, %d updated, %d deleted, %d unchanged, %d failed\n",
+	fmt.Fprintf(stdout, "%d created, %d updated, %d deleted, %d unchanged, %d failed\n",
 		summary.Created, summary.Updated, summary.Deleted, summary.Unchanged, summary.Failed)
 
 	return summary

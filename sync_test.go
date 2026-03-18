@@ -151,7 +151,7 @@ func testIOStreams(stdin string, isTerminal bool) (*IOStreams, *bytes.Buffer, *b
 func TestRunSyncApproveFlow(t *testing.T) {
 	// Setup: create temp sync file
 	syncFile := t.TempDir() + "/params.yml"
-	if err := os.WriteFile(syncFile, []byte("/app/key1: \"newval\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(syncFile, []byte("/app/key1: \"newval\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -235,7 +235,9 @@ func TestRunSyncApproveFlow(t *testing.T) {
 
 	t.Run("no changes skips prompt", func(t *testing.T) {
 		syncFileNoChange := t.TempDir() + "/params.yml"
-		os.WriteFile(syncFileNoChange, []byte("/app/key1: \"sameval\"\n"), 0o644)
+		if err := os.WriteFile(syncFileNoChange, []byte("/app/key1: \"sameval\"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
 		s := newFakeStoreWithExisting(map[string]string{"/app/key1": "sameval"})
 		io, stdout, stderr := testIOStreams("", true)
 		cfg := Config{File: syncFileNoChange}
