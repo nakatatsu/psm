@@ -22,7 +22,8 @@ Feature development follows these steps in order. Each step uses the correspondi
 6. `/speckit.tasks` → Generate dependency-ordered `tasks.md`
 7. `/speckit.analyze` → Cross-check consistency across spec/plan/tasks
 8. `/speckit.implement` → Implement based on `tasks.md`
-9. `/check` → Run mechanical checks (formatter, linter, tests) after coding
+9. `/simplify` → Review changed code for reuse, quality, and efficiency (required if code was changed)
+10. `/check` → Run mechanical checks (formatter, linter, tests) after coding
 
 ### As Needed
 
