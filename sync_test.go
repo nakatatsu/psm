@@ -28,6 +28,7 @@ func (f *fakeStore) GetAll(_ context.Context) (map[string]string, error) {
 	}
 	return nil, nil
 }
+
 func (f *fakeStore) Put(_ context.Context, key, value string) error {
 	if err, ok := f.putErr[key]; ok {
 		return err
@@ -150,7 +151,7 @@ func testIOStreams(stdin string, isTerminal bool) (*IOStreams, *bytes.Buffer, *b
 func TestRunSyncApproveFlow(t *testing.T) {
 	// Setup: create temp sync file
 	syncFile := t.TempDir() + "/params.yml"
-	if err := os.WriteFile(syncFile, []byte("/app/key1: \"newval\"\n"), 0644); err != nil {
+	if err := os.WriteFile(syncFile, []byte("/app/key1: \"newval\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -234,7 +235,7 @@ func TestRunSyncApproveFlow(t *testing.T) {
 
 	t.Run("no changes skips prompt", func(t *testing.T) {
 		syncFileNoChange := t.TempDir() + "/params.yml"
-		os.WriteFile(syncFileNoChange, []byte("/app/key1: \"sameval\"\n"), 0644)
+		os.WriteFile(syncFileNoChange, []byte("/app/key1: \"sameval\"\n"), 0o644)
 		s := newFakeStoreWithExisting(map[string]string{"/app/key1": "sameval"})
 		io, stdout, stderr := testIOStreams("", true)
 		cfg := Config{File: syncFileNoChange}
