@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -16,6 +17,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	level := slog.LevelInfo
+	if cfg.Debug {
+		level = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+	})))
 
 	exitCode, err := run(cfg)
 	if err != nil {
@@ -50,9 +59,19 @@ func run(cfg Config) (int, error) {
 		store = NewSMStore(awsCfg)
 	}
 
+	streams := &IOStreams{
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		IsTerminal: func() bool {
+			fi, err := os.Stdin.Stat()
+			return err == nil && fi.Mode()&os.ModeCharDevice != 0
+		},
+	}
+
 	switch cfg.Subcommand {
 	case "sync":
-		return runSync(ctx, cfg, store)
+		return runSync(ctx, cfg, store, streams)
 	case "export":
 		return runExport(ctx, cfg, store)
 	}
@@ -60,7 +79,7 @@ func run(cfg Config) (int, error) {
 	return 1, fmt.Errorf("unknown subcommand: %s", cfg.Subcommand)
 }
 
-func runSync(ctx context.Context, cfg Config, store Store) (int, error) {
+func runSync(ctx context.Context, cfg Config, store Store, io *IOStreams) (int, error) {
 	data, err := os.ReadFile(cfg.File)
 	if err != nil {
 		return 1, fmt.Errorf("failed to read file %s: %w", cfg.File, err)
@@ -76,8 +95,76 @@ func runSync(ctx context.Context, cfg Config, store Store) (int, error) {
 		return 1, fmt.Errorf("failed to get existing parameters: %w", err)
 	}
 
-	actions := plan(entries, existing, cfg.Prune)
-	summary := execute(ctx, actions, store, cfg.DryRun, os.Stdout, os.Stderr)
+	actions := plan(entries, existing)
+
+	// Delete flow
+	if cfg.DeleteFile != "" {
+		deleteData, err := os.ReadFile(cfg.DeleteFile)
+		if err != nil {
+			return 1, fmt.Errorf("failed to read delete file %s: %w", cfg.DeleteFile, err)
+		}
+
+		patterns, err := parseDeletePatterns(deleteData)
+		if err != nil {
+			return 1, err
+		}
+
+		yamlKeys := make(map[string]bool)
+		for _, e := range entries {
+			yamlKeys[e.Key] = true
+		}
+
+		deletes, conflicts, unmanaged := planDeletes(existing, yamlKeys, patterns)
+
+		// Conflict detection — abort before any execution
+		if len(conflicts) > 0 {
+			for _, k := range conflicts {
+				slog.Error("conflict: deletion candidate exists in sync YAML", "key", k)
+			}
+			return 1, fmt.Errorf("aborting — %d conflict(s) detected, no changes made", len(conflicts))
+		}
+
+		// Warn about unmanaged keys
+		for _, k := range unmanaged {
+			slog.Warn("unmanaged key detected", "key", k)
+		}
+
+		actions = append(actions, deletes...)
+	}
+
+	// Check if there are any changes
+	hasChanges := false
+	for _, a := range actions {
+		if a.Type != ActionSkip {
+			hasChanges = true
+			break
+		}
+	}
+
+	if cfg.DryRun {
+		displayPlan(actions, io.Stdout)
+		printSummary(actions, true, io.Stdout)
+		return 0, nil
+	}
+
+	if !hasChanges {
+		printSummary(actions, false, io.Stdout)
+		return 0, nil
+	}
+
+	displayPlan(actions, io.Stdout)
+
+	// Approval flow
+	if !cfg.SkipApprove {
+		if !io.IsTerminal() {
+			return 0, nil
+		}
+		if !promptApprove(io.Stdin, io.Stderr) {
+			return 0, nil
+		}
+	}
+
+	summary := execute(ctx, actions, store, false, io.Stdout, io.Stderr)
 
 	if summary.Failed > 0 {
 		return 1, nil
@@ -101,10 +188,20 @@ func parseArgs(args []string) (Config, error) {
 	store := fs.String("store", "", "store type: ssm or sm")
 	profile := fs.String("profile", "", "AWS profile name")
 
-	var prune, dryRun bool
+	var dryRun, skipApprove, debug bool
+	var deleteFile string
 	if sub == "sync" {
-		fs.BoolVar(&prune, "prune", false, "delete keys not in YAML")
 		fs.BoolVar(&dryRun, "dry-run", false, "show plan without executing")
+		fs.BoolVar(&skipApprove, "skip-approve", false, "skip approval prompt")
+		fs.StringVar(&deleteFile, "delete", "", "YAML file with delete regex patterns")
+	}
+	fs.BoolVar(&debug, "debug", false, "enable debug logging")
+
+	// Detect removed --prune flag before parsing
+	for _, arg := range args[2:] {
+		if arg == "--prune" {
+			return Config{}, fmt.Errorf("--prune has been removed. Use --delete <file> with regex patterns instead")
+		}
 	}
 
 	if err := fs.Parse(args[2:]); err != nil {
@@ -124,11 +221,13 @@ func parseArgs(args []string) (Config, error) {
 	}
 
 	return Config{
-		Subcommand: sub,
-		Store:      *store,
-		Profile:    *profile,
-		Prune:      prune,
-		DryRun:     dryRun,
-		File:       remaining[0],
+		Subcommand:  sub,
+		Store:       *store,
+		Profile:     *profile,
+		DryRun:      dryRun,
+		SkipApprove: skipApprove,
+		Debug:       debug,
+		DeleteFile:  deleteFile,
+		File:        remaining[0],
 	}, nil
 }

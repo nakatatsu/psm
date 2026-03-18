@@ -22,19 +22,29 @@ func TestParseArgs(t *testing.T) {
 			want: Config{Subcommand: "sync", Store: "sm", Profile: "prod", File: "file.yaml"},
 		},
 		{
-			name: "sync with prune",
-			args: []string{"psm", "sync", "--store", "ssm", "--prune", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "ssm", Prune: true, File: "file.yaml"},
-		},
-		{
 			name: "sync with dry-run",
 			args: []string{"psm", "sync", "--store", "ssm", "--dry-run", "file.yaml"},
 			want: Config{Subcommand: "sync", Store: "ssm", DryRun: true, File: "file.yaml"},
 		},
 		{
-			name: "sync with prune and dry-run",
-			args: []string{"psm", "sync", "--store", "ssm", "--prune", "--dry-run", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "ssm", Prune: true, DryRun: true, File: "file.yaml"},
+			name: "sync with skip-approve",
+			args: []string{"psm", "sync", "--store", "ssm", "--skip-approve", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "ssm", SkipApprove: true, File: "file.yaml"},
+		},
+		{
+			name: "sync with debug",
+			args: []string{"psm", "sync", "--store", "ssm", "--debug", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "ssm", Debug: true, File: "file.yaml"},
+		},
+		{
+			name: "sync with delete file",
+			args: []string{"psm", "sync", "--store", "ssm", "--delete", "needless.yml", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "ssm", DeleteFile: "needless.yml", File: "file.yaml"},
+		},
+		{
+			name: "sync all flags combined",
+			args: []string{"psm", "sync", "--store", "ssm", "--dry-run", "--skip-approve", "--debug", "--delete", "del.yml", "file.yaml"},
+			want: Config{Subcommand: "sync", Store: "ssm", DryRun: true, SkipApprove: true, Debug: true, DeleteFile: "del.yml", File: "file.yaml"},
 		},
 		{
 			name: "export with ssm",
@@ -45,6 +55,11 @@ func TestParseArgs(t *testing.T) {
 			name: "export with sm and profile",
 			args: []string{"psm", "export", "--store", "sm", "--profile", "staging", "out.yaml"},
 			want: Config{Subcommand: "export", Store: "sm", Profile: "staging", File: "out.yaml"},
+		},
+		{
+			name: "export with debug",
+			args: []string{"psm", "export", "--store", "ssm", "--debug", "out.yaml"},
+			want: Config{Subcommand: "export", Store: "ssm", Debug: true, File: "out.yaml"},
 		},
 		{
 			name:    "no subcommand",
@@ -81,6 +96,11 @@ func TestParseArgs(t *testing.T) {
 			args:    []string{"psm", "export", "out.yaml"},
 			wantErr: true,
 		},
+		{
+			name:    "prune flag removed",
+			args:    []string{"psm", "sync", "--store", "ssm", "--prune", "file.yaml"},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -104,11 +124,17 @@ func TestParseArgs(t *testing.T) {
 			if got.Profile != tt.want.Profile {
 				t.Errorf("Profile = %q, want %q", got.Profile, tt.want.Profile)
 			}
-			if got.Prune != tt.want.Prune {
-				t.Errorf("Prune = %v, want %v", got.Prune, tt.want.Prune)
-			}
 			if got.DryRun != tt.want.DryRun {
 				t.Errorf("DryRun = %v, want %v", got.DryRun, tt.want.DryRun)
+			}
+			if got.SkipApprove != tt.want.SkipApprove {
+				t.Errorf("SkipApprove = %v, want %v", got.SkipApprove, tt.want.SkipApprove)
+			}
+			if got.Debug != tt.want.Debug {
+				t.Errorf("Debug = %v, want %v", got.Debug, tt.want.Debug)
+			}
+			if got.DeleteFile != tt.want.DeleteFile {
+				t.Errorf("DeleteFile = %q, want %q", got.DeleteFile, tt.want.DeleteFile)
 			}
 			if got.File != tt.want.File {
 				t.Errorf("File = %q, want %q", got.File, tt.want.File)

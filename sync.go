@@ -1,20 +1,19 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
-	"sort"
+	"strings"
 	"sync"
 )
 
 // plan computes actions by comparing YAML entries against existing AWS state.
-func plan(entries []Entry, existing map[string]string, prune bool) []Action {
+func plan(entries []Entry, existing map[string]string) []Action {
 	var actions []Action
-	yamlKeys := make(map[string]bool)
 
 	for _, e := range entries {
-		yamlKeys[e.Key] = true
 		awsVal, exists := existing[e.Key]
 		switch {
 		case !exists:
@@ -26,20 +25,53 @@ func plan(entries []Entry, existing map[string]string, prune bool) []Action {
 		}
 	}
 
-	if prune {
-		var deleteKeys []string
-		for k := range existing {
-			if !yamlKeys[k] {
-				deleteKeys = append(deleteKeys, k)
-			}
-		}
-		sort.Strings(deleteKeys)
-		for _, k := range deleteKeys {
-			actions = append(actions, Action{Key: k, Type: ActionDelete})
+	return actions
+}
+
+// displayPlan renders the action list to stdout without executing.
+func displayPlan(actions []Action, stdout io.Writer) {
+	for _, a := range actions {
+		switch a.Type {
+		case ActionSkip:
+			continue
+		default:
+			fmt.Fprintf(stdout, "%s: %s\n", a.Type, a.Key)
 		}
 	}
+}
 
-	return actions
+// printSummary outputs the summary line for an action list.
+func printSummary(actions []Action, dryRun bool, stdout io.Writer) {
+	var created, updated, deleted, unchanged int
+	for _, a := range actions {
+		switch a.Type {
+		case ActionCreate:
+			created++
+		case ActionUpdate:
+			updated++
+		case ActionDelete:
+			deleted++
+		case ActionSkip:
+			unchanged++
+		}
+	}
+	suffix := ""
+	if dryRun {
+		suffix = " (dry-run)"
+	}
+	fmt.Fprintf(stdout, "%d created, %d updated, %d deleted, %d unchanged, 0 failed%s\n",
+		created, updated, deleted, unchanged, suffix)
+}
+
+// promptApprove asks the user for confirmation. Returns true only for "y" or "Y".
+func promptApprove(reader io.Reader, writer io.Writer) bool {
+	fmt.Fprint(writer, "Proceed? [y/N] ")
+	scanner := bufio.NewScanner(reader)
+	if !scanner.Scan() {
+		return false
+	}
+	input := strings.TrimSpace(scanner.Text())
+	return input == "y" || input == "Y"
 }
 
 // execute runs planned actions against the store.

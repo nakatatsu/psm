@@ -1,6 +1,9 @@
 package main
 
-import "context"
+import (
+	"context"
+	"io"
+)
 
 // ActionType represents the type of sync operation.
 type ActionType int
@@ -29,12 +32,14 @@ func (a ActionType) String() string {
 
 // Config holds CLI flags and arguments.
 type Config struct {
-	Subcommand string
-	Store      string
-	Profile    string
-	Prune      bool
-	DryRun     bool
-	File       string
+	Subcommand  string
+	Store       string
+	Profile     string
+	DryRun      bool
+	SkipApprove bool
+	Debug       bool
+	DeleteFile  string
+	File        string
 }
 
 // Entry is a single key-value pair from YAML.
@@ -65,4 +70,12 @@ type Store interface {
 	GetAll(ctx context.Context) (map[string]string, error)
 	Put(ctx context.Context, key, value string) error
 	Delete(ctx context.Context, keys []string) error
+}
+
+// IOStreams holds I/O dependencies for testability.
+type IOStreams struct {
+	Stdin      io.Reader
+	Stdout     io.Writer
+	Stderr     io.Writer
+	IsTerminal func() bool
 }

@@ -187,101 +187,6 @@ func TestSSMStorePutAndDelete(t *testing.T) {
 	}
 }
 
-func TestSSMPrune(t *testing.T) {
-	skipIfNoAWS(t)
-	cfg := loadAWSConfig(t)
-	client := ssm.NewFromConfig(cfg)
-	store := NewSSMStore(cfg)
-	ctx := context.Background()
-
-	cleanAllSSMTestParams(t, client)
-
-	keys := []string{
-		ssmTestPrefix + "prune-k1",
-		ssmTestPrefix + "prune-k2",
-		ssmTestPrefix + "prune-k3",
-	}
-	setupSSMTestData(t, client, map[string]string{
-		keys[0]: "v1",
-		keys[1]: "v2",
-		keys[2]: "v3",
-	})
-	defer cleanupSSMTestData(t, client, keys)
-
-	// YAML has only k1, k2
-	entries := []Entry{
-		{Key: keys[0], Value: "v1"},
-		{Key: keys[1], Value: "v2"},
-	}
-
-	// Build existing map via GetParameter (strongly consistent, unlike GetParametersByPath)
-	existing := make(map[string]string)
-	for _, k := range keys {
-		if v, ok := getSSMParam(t, client, k); ok {
-			existing[k] = v
-		}
-	}
-
-	// With prune
-	actions := plan(entries, existing, true)
-	var stdout, stderr bytes.Buffer
-	summary := execute(ctx, actions, store, false, &stdout, &stderr)
-
-	if summary.Deleted != 1 {
-		t.Errorf("deleted = %d, want 1", summary.Deleted)
-	}
-	out := stdout.String()
-	if !strings.Contains(out, "delete: "+keys[2]) {
-		t.Errorf("stdout missing delete line: %s", out)
-	}
-
-	// Verify k3 is actually deleted
-	after, _ := store.GetAll(ctx)
-	if _, exists := after[keys[2]]; exists {
-		t.Error("k3 should be deleted after prune")
-	}
-}
-
-func TestSSMNoPrune(t *testing.T) {
-	skipIfNoAWS(t)
-	cfg := loadAWSConfig(t)
-	client := ssm.NewFromConfig(cfg)
-	store := NewSSMStore(cfg)
-	ctx := context.Background()
-
-	cleanAllSSMTestParams(t, client)
-
-	keys := []string{
-		ssmTestPrefix + "noprune-k1",
-		ssmTestPrefix + "noprune-k2",
-	}
-	setupSSMTestData(t, client, map[string]string{
-		keys[0]: "v1",
-		keys[1]: "v2",
-	})
-	defer cleanupSSMTestData(t, client, keys)
-
-	entries := []Entry{{Key: keys[0], Value: "v1"}}
-	// Build existing via GetParameter (strongly consistent)
-	existing := make(map[string]string)
-	for _, k := range keys {
-		if v, ok := getSSMParam(t, client, k); ok {
-			existing[k] = v
-		}
-	}
-	actions := plan(entries, existing, false)
-	var stdout, stderr bytes.Buffer
-	summary := execute(ctx, actions, store, false, &stdout, &stderr)
-
-	if summary.Deleted != 0 {
-		t.Errorf("deleted = %d, want 0", summary.Deleted)
-	}
-	// Verify k2 still exists via GetParameter
-	if _, exists := getSSMParam(t, client, keys[1]); !exists {
-		t.Error("k2 should still exist without prune")
-	}
-}
-
 func TestSSMDryRun(t *testing.T) {
 	skipIfNoAWS(t)
 	cfg := loadAWSConfig(t)
@@ -300,7 +205,7 @@ func TestSSMDryRun(t *testing.T) {
 		{Key: key, Value: "changed"},
 	}
 	existing, _ := store.GetAll(ctx)
-	actions := plan(entries, existing, false)
+	actions := plan(entries, existing)
 	var stdout, stderr bytes.Buffer
 	summary := execute(ctx, actions, store, true, &stdout, &stderr)
 
@@ -354,7 +259,7 @@ func TestSSMSyncExecute(t *testing.T) {
 			existing[k] = v
 		}
 	}
-	actions := plan(entries, existing, false)
+	actions := plan(entries, existing)
 
 	var stdout, stderr bytes.Buffer
 	summary := execute(ctx, actions, store, false, &stdout, &stderr)

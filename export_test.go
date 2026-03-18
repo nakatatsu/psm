@@ -100,7 +100,7 @@ func TestExportRoundTrip(t *testing.T) {
 	}
 
 	existing, _ := store.GetAll(ctx)
-	actions := plan(entries, existing, false)
+	actions := plan(entries, existing)
 
 	for _, a := range actions {
 		if a.Type != ActionSkip {
