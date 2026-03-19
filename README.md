@@ -2,7 +2,7 @@
 
 > **Status: Under Development**
 
-YAML files to AWS SSM Parameter Store / Secrets Manager sync tool.
+YAML files to AWS SSM Parameter Store sync tool.
 
 ## Install
 
@@ -13,12 +13,12 @@ Download prebuilt binaries from [GitHub Releases](https://github.com/nakatatsu/p
 ### Sync: push YAML to AWS
 
 ```bash
-psm sync --store <ssm|sm> [--profile <name>] [--dry-run] [--skip-approve] [--debug] [--delete <file>] <sync-file>
+psm sync --store ssm [--profile <name>] [--dry-run] [--skip-approve] [--debug] [--delete <file>] <sync-file>
 ```
 
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--store <ssm\|sm>` | Yes | Target store: `ssm` (Parameter Store) or `sm` (Secrets Manager) |
+| `--store ssm` | Yes | Target store: `ssm` (Parameter Store) |
 | `--profile <name>` | No | AWS profile name (default: SDK default credentials) |
 | `--dry-run` | No | Show planned changes without executing or prompting |
 | `--skip-approve` | No | Skip approval prompt and execute immediately (for CI/automation) |
@@ -69,7 +69,7 @@ Only keys matching the patterns **and not present in the sync YAML** are deleted
 ### Export: pull AWS parameters to YAML
 
 ```bash
-psm export --store <ssm|sm> [--profile <name>] [--debug] <file>
+psm export --store ssm [--profile <name>] [--debug] <file>
 ```
 
 ```bash
@@ -91,7 +91,7 @@ See [example/README.md](example/README.md) for a full walkthrough including key 
 
 ### YAML format
 
-Keys map directly to AWS parameter/secret names. Values must be scalars (string, int, bool, float).
+Keys map directly to AWS parameter names. Values must be scalars (string, int, bool, float).
 
 ```yaml
 /myapp/database/host: localhost
