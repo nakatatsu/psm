@@ -55,8 +55,6 @@ func run(cfg Config) (int, error) {
 	switch cfg.Store {
 	case "ssm":
 		store = NewSSMStore(awsCfg)
-	case "sm":
-		store = NewSMStore(awsCfg)
 	}
 
 	switch cfg.Subcommand {
@@ -183,7 +181,7 @@ func parseArgs(args []string) (Config, error) {
 	fs := flag.NewFlagSet(sub, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	store := fs.String("store", "", "store type: ssm or sm")
+	store := fs.String("store", "", "store type: ssm")
 	profile := fs.String("profile", "", "AWS profile name")
 
 	var dryRun, skipApprove, debug bool
@@ -207,15 +205,15 @@ func parseArgs(args []string) (Config, error) {
 	}
 
 	if *store == "" {
-		return Config{}, fmt.Errorf("--store is required. usage: psm %s --store <ssm|sm> [flags] <file>", sub)
+		return Config{}, fmt.Errorf("--store is required. usage: psm %s --store ssm [flags] <file>", sub)
 	}
-	if *store != "ssm" && *store != "sm" {
-		return Config{}, fmt.Errorf("invalid --store value %q: must be ssm or sm", *store)
+	if *store != "ssm" {
+		return Config{}, fmt.Errorf("invalid --store value %q: must be ssm", *store)
 	}
 
 	remaining := fs.Args()
 	if len(remaining) != 1 {
-		return Config{}, fmt.Errorf("exactly one file argument required. usage: psm %s --store <ssm|sm> [flags] <file>", sub)
+		return Config{}, fmt.Errorf("exactly one file argument required. usage: psm %s --store ssm [flags] <file>", sub)
 	}
 
 	return Config{
