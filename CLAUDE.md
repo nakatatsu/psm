@@ -5,8 +5,6 @@
 - Always save `.claude/` files (skills, settings, etc.) in the repository (`/workspace/.claude/`), never in `~/.claude/`.
 
 ## Active Technologies
-- Markdown (Claude Code SKILL.md format) + git 2.39+, bash (026-worktree-setup-skill)
-
 - Go 1.26 + AWS SDK for Go v2, gopkg.in/yaml.v3, regexp, log/slog (027-omit-secrets-manager)
 - AWS SSM Parameter Store (027-omit-secrets-manager)
 
