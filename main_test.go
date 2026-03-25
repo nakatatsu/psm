@@ -101,6 +101,16 @@ func TestParseArgs(t *testing.T) {
 			args:    []string{"psm", "sync", "--store", "ssm", "--prune", "file.yaml"},
 			wantErr: true,
 		},
+		{
+			name: "version flag",
+			args: []string{"psm", "--version"},
+			want: Config{ShowVersion: true},
+		},
+		{
+			name: "version flag with extra args",
+			args: []string{"psm", "--version", "sync"},
+			want: Config{ShowVersion: true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -138,6 +148,9 @@ func TestParseArgs(t *testing.T) {
 			}
 			if got.File != tt.want.File {
 				t.Errorf("File = %q, want %q", got.File, tt.want.File)
+			}
+			if got.ShowVersion != tt.want.ShowVersion {
+				t.Errorf("ShowVersion = %v, want %v", got.ShowVersion, tt.want.ShowVersion)
 			}
 		})
 	}
