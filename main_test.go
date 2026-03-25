@@ -17,9 +17,9 @@ func TestParseArgs(t *testing.T) {
 			want: Config{Subcommand: "sync", Store: "ssm", File: "file.yaml"},
 		},
 		{
-			name: "sync with sm and profile",
-			args: []string{"psm", "sync", "--store", "sm", "--profile", "prod", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "sm", Profile: "prod", File: "file.yaml"},
+			name:    "sync with sm is invalid",
+			args:    []string{"psm", "sync", "--store", "sm", "--profile", "prod", "file.yaml"},
+			wantErr: true,
 		},
 		{
 			name: "sync with dry-run",
@@ -52,9 +52,9 @@ func TestParseArgs(t *testing.T) {
 			want: Config{Subcommand: "export", Store: "ssm", File: "out.yaml"},
 		},
 		{
-			name: "export with sm and profile",
-			args: []string{"psm", "export", "--store", "sm", "--profile", "staging", "out.yaml"},
-			want: Config{Subcommand: "export", Store: "sm", Profile: "staging", File: "out.yaml"},
+			name:    "export with sm is invalid",
+			args:    []string{"psm", "export", "--store", "sm", "--profile", "staging", "out.yaml"},
+			wantErr: true,
 		},
 		{
 			name: "export with debug",
