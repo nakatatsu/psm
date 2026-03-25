@@ -1,3 +1,29 @@
+# ── Stage 1: Build Git from source ──────────────────────────────
+FROM debian:bookworm-slim AS git-builder
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ARG GIT_VERSION=2.53.0
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential \
+  libcurl4-openssl-dev \
+  libexpat1-dev \
+  libz-dev \
+  libssl-dev \
+  gettext \
+  curl \
+  ca-certificates \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz" -o git.tar.xz && \
+  tar -xf git.tar.xz && \
+  cd "git-${GIT_VERSION}" && \
+  make prefix=/usr/local -j"$(nproc)" all && \
+  make prefix=/usr/local install && \
+  cd .. && rm -rf "git-${GIT_VERSION}" git.tar.xz
+
+# ── Stage 2: Runtime ────────────────────────────────────────────
 FROM debian:bookworm-slim
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -21,10 +47,17 @@ ARG ZSH_IN_DOCKER_VERSION=1.2.0
 RUN groupadd --gid 1000 node && \
   useradd --uid 1000 --gid node --shell /bin/zsh --create-home node
 
+# Git from builder stage (replaces apt git 2.39)
+COPY --from=git-builder /usr/local/bin/git* /usr/local/bin/
+COPY --from=git-builder /usr/local/libexec/git-core/ /usr/local/libexec/git-core/
+COPY --from=git-builder /usr/local/share/git-core/ /usr/local/share/git-core/
+
 # Install basic development tools and iptables/ipset
+# libcurl4 + libexpat1 are runtime deps for the source-built Git
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
-  git \
+  libcurl4 \
+  libexpat1 \
   procps \
   sudo \
   fzf \
