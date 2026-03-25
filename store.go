@@ -40,6 +40,7 @@ type Config struct {
 	Debug       bool
 	DeleteFile  string
 	File        string
+	ShowVersion bool
 }
 
 // Entry is a single key-value pair from YAML.

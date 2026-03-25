@@ -11,11 +11,18 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 )
 
+var version = "dev"
+
 func main() {
 	cfg, err := parseArgs(os.Args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+
+	if cfg.ShowVersion {
+		fmt.Printf("psm version %s\n", version)
+		os.Exit(0)
 	}
 
 	level := slog.LevelInfo
@@ -171,6 +178,10 @@ func runSync(ctx context.Context, cfg Config, store Store, io *IOStreams) (int, 
 func parseArgs(args []string) (Config, error) {
 	if len(args) < 2 {
 		return Config{}, fmt.Errorf("usage: psm <sync|export> [flags] <file>")
+	}
+
+	if args[1] == "--version" {
+		return Config{ShowVersion: true}, nil
 	}
 
 	sub := args[1]
