@@ -2,8 +2,6 @@
 name: worktree-remove
 description: >
   Remove a git worktree created by /worktree-setup under .worktrees/.
-  Handles the relative-path incompatibility with `git worktree remove` on Git < 2.48
-  by cleaning up both the worktree directory and git's internal tracking.
   Use when the user says "remove worktree", "delete worktree", "clean up worktree",
   or wants to remove a parallel working directory.
 ---
@@ -59,14 +57,9 @@ Wait for user confirmation before proceeding.
 
 ### Step 3: Remove Worktree
 
-Because relative paths are incompatible with `git worktree remove` on Git < 2.48, use manual cleanup:
-
 ```bash
-rm -rf .worktrees/<dir-name>
-git worktree prune
+git worktree remove .worktrees/<dir-name>
 ```
-
-This removes the worktree directory and lets `git worktree prune` clean up git's internal tracking (`.git/worktrees/<dir-name>`).
 
 ### Step 4: Optionally Delete the Branch
 
@@ -109,4 +102,4 @@ Worktree .worktrees/<dir-name> removed successfully.
 ## Important Notes
 
 - This skill only removes worktrees under `.worktrees/`. It does NOT touch worktrees managed by Claude Code's built-in `EnterWorktree`/`ExitWorktree` (which use `.claude/worktrees/`).
-- The manual cleanup approach (`rm -rf` + `git worktree prune`) is used because `git worktree remove` does not work with relative paths on Git < 2.48.
+- Requires Git 2.48+ for `worktree.useRelativePaths` support.
