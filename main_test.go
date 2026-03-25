@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -125,32 +126,8 @@ func TestParseArgs(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if got.Subcommand != tt.want.Subcommand {
-				t.Errorf("Subcommand = %q, want %q", got.Subcommand, tt.want.Subcommand)
-			}
-			if got.Store != tt.want.Store {
-				t.Errorf("Store = %q, want %q", got.Store, tt.want.Store)
-			}
-			if got.Profile != tt.want.Profile {
-				t.Errorf("Profile = %q, want %q", got.Profile, tt.want.Profile)
-			}
-			if got.DryRun != tt.want.DryRun {
-				t.Errorf("DryRun = %v, want %v", got.DryRun, tt.want.DryRun)
-			}
-			if got.SkipApprove != tt.want.SkipApprove {
-				t.Errorf("SkipApprove = %v, want %v", got.SkipApprove, tt.want.SkipApprove)
-			}
-			if got.Debug != tt.want.Debug {
-				t.Errorf("Debug = %v, want %v", got.Debug, tt.want.Debug)
-			}
-			if got.DeleteFile != tt.want.DeleteFile {
-				t.Errorf("DeleteFile = %q, want %q", got.DeleteFile, tt.want.DeleteFile)
-			}
-			if got.File != tt.want.File {
-				t.Errorf("File = %q, want %q", got.File, tt.want.File)
-			}
-			if got.ShowVersion != tt.want.ShowVersion {
-				t.Errorf("ShowVersion = %v, want %v", got.ShowVersion, tt.want.ShowVersion)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseArgs() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}
