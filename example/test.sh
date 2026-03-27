@@ -43,7 +43,7 @@ PROFILE_FLAG="--profile ${PSM_TEST_PROFILE}"
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0
-SCENARIO_TOTAL=12
+SCENARIO_TOTAL=14
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -249,7 +249,7 @@ echo "cleaning up previous test data ..."
 cleanup_all
 
 # ---------------------------------------------------------------------------
-# Scenario 1/12: Dry-run
+# Scenario 1/14: Dry-run
 # ---------------------------------------------------------------------------
 echo "=== Scenario 1/${SCENARIO_TOTAL}: Dry-run ==="
 
@@ -267,7 +267,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 2/12: Sync with --skip-approve
+# Scenario 2/14: Sync with --skip-approve
 # ---------------------------------------------------------------------------
 echo "=== Scenario 2/${SCENARIO_TOTAL}: Sync with --skip-approve ==="
 
@@ -285,7 +285,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 3/12: Delete with --delete
+# Scenario 3/14: Delete with --delete
 # ---------------------------------------------------------------------------
 echo "=== Scenario 3/${SCENARIO_TOTAL}: Delete with --delete ==="
 
@@ -307,7 +307,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 4/12: Conflict detection
+# Scenario 4/14: Conflict detection
 # ---------------------------------------------------------------------------
 echo "=== Scenario 4/${SCENARIO_TOTAL}: Conflict detection ==="
 
@@ -327,7 +327,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 5/12: Debug logging
+# Scenario 5/14: Debug logging
 # ---------------------------------------------------------------------------
 echo "=== Scenario 5/${SCENARIO_TOTAL}: Debug logging ==="
 
@@ -350,31 +350,32 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 6/12: Non-terminal auto-decline
+# Scenario 6/14: Piped input + /dev/tty approve
 # ---------------------------------------------------------------------------
-echo "=== Scenario 6/${SCENARIO_TOTAL}: Non-terminal auto-decline ==="
+echo "=== Scenario 6/${SCENARIO_TOTAL}: Piped input + /dev/tty approve ==="
 
-# Modify a value so there would be a change if executed
-put_param "/myapp/database/host" "original-value"
-
-# Pipe input without --skip-approve -> stdin is not a terminal -> auto-decline
-exit_code=0
-cat "${TEST_YAML}" | \
-  ${PSM} sync ${PROFILE_FLAG} /dev/stdin || exit_code=$?
-
-val=$(get_param "/myapp/database/host" || echo "")
-if [[ "${val}" == "original-value" ]]; then
-  pass
+if ! command -v script >/dev/null 2>&1; then
+  skip "'script' command not found"
 else
-  fail "expected 'original-value' (unchanged), got '${val}'"
-fi
+  # Modify a value so sync has work to do
+  put_param "/myapp/database/host" "old-value"
 
-# Restore value for next scenario
-put_param "/myapp/database/host" "localhost"
+  # Pipe YAML via stdin; approval prompt reads from /dev/tty (via script pseudo-TTY)
+  exit_code=0
+  printf 'y\n' | script -qec \
+    "cat ${TEST_YAML} | ${PSM} sync ${PROFILE_FLAG} /dev/stdin" /dev/null \
+    || exit_code=$?
+
+  if ! assert_state "piped+tty yes: sync applied" "${EXPECTED_FULL_STATE[@]}"; then
+    fail "piped input + tty approve did not apply changes"
+  else
+    pass
+  fi
+fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 7/12: No changes
+# Scenario 7/14: No changes
 # ---------------------------------------------------------------------------
 echo "=== Scenario 7/${SCENARIO_TOTAL}: No changes ==="
 
@@ -397,7 +398,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 8/12: Missing file
+# Scenario 8/14: Missing file
 # ---------------------------------------------------------------------------
 echo "=== Scenario 8/${SCENARIO_TOTAL}: Missing file ==="
 
@@ -415,7 +416,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 9/12: Invalid YAML
+# Scenario 9/14: Invalid YAML
 # ---------------------------------------------------------------------------
 echo "=== Scenario 9/${SCENARIO_TOTAL}: Invalid YAML ==="
 
@@ -438,7 +439,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 10/12: Empty input
+# Scenario 10/14: Empty input
 # ---------------------------------------------------------------------------
 echo "=== Scenario 10/${SCENARIO_TOTAL}: Empty input ==="
 
@@ -456,7 +457,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 11/12: TTY approve yes
+# Scenario 11/14: TTY approve yes
 # ---------------------------------------------------------------------------
 echo "=== Scenario 11/${SCENARIO_TOTAL}: TTY approve yes ==="
 
@@ -480,7 +481,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 12/12: TTY approve no
+# Scenario 12/14: TTY approve no
 # ---------------------------------------------------------------------------
 echo "=== Scenario 12/${SCENARIO_TOTAL}: TTY approve no ==="
 
@@ -513,6 +514,58 @@ else
 
   # Restore for clean exit
   put_param "/myapp/database/host" "localhost"
+fi
+echo ""
+
+# ---------------------------------------------------------------------------
+# Scenario 13/14: Piped input + /dev/tty decline
+# ---------------------------------------------------------------------------
+echo "=== Scenario 13/${SCENARIO_TOTAL}: Piped input + /dev/tty decline ==="
+
+if ! command -v script >/dev/null 2>&1; then
+  skip "'script' command not found"
+else
+  # Change a value so sync has work to do
+  put_param "/myapp/database/host" "should-stay"
+
+  # Pipe YAML via stdin; decline approval via /dev/tty (pseudo-TTY from script)
+  exit_code=0
+  printf 'N\n' | script -qec \
+    "cat ${TEST_YAML} | ${PSM} sync ${PROFILE_FLAG} /dev/stdin" /dev/null \
+    || exit_code=$?
+
+  val=$(get_param "/myapp/database/host" || echo "")
+  if [[ "${val}" != "should-stay" ]]; then
+    fail "piped input + tty decline should not change state, got '${val}'"
+  else
+    pass
+  fi
+
+  # Restore for next scenario
+  put_param "/myapp/database/host" "localhost"
+fi
+echo ""
+
+# ---------------------------------------------------------------------------
+# Scenario 14/14: Piped input + no TTY → error
+# ---------------------------------------------------------------------------
+echo "=== Scenario 14/${SCENARIO_TOTAL}: Piped input + no TTY → error ==="
+
+if ! command -v setsid >/dev/null 2>&1; then
+  skip "'setsid' command not found"
+else
+  # setsid detaches from controlling terminal, so /dev/tty is unavailable
+  exit_code=0
+  cat "${TEST_YAML}" | \
+    setsid --wait ${PSM} sync ${PROFILE_FLAG} /dev/stdin 2>/dev/null || exit_code=$?
+
+  if [[ ${exit_code} -ne 1 ]]; then
+    fail "expected exit code 1 (no tty), got ${exit_code}"
+  elif ! assert_state "no-tty: state unchanged" "${EXPECTED_FULL_STATE[@]}"; then
+    fail "no-tty error changed SSM state"
+  else
+    pass
+  fi
 fi
 echo ""
 
