@@ -170,7 +170,7 @@ aws ssm get-parameter --name /myapp/database/host --profile <your-profile> --que
 .sops.yaml.example   SOPS config template (copy to .sops.yaml)
 secrets.yaml         Sample secrets (replace with real values)
 README.md            This file
-test.sh              Manual verification commands
+test.sh              Automated integration test script
 ```
 
 ## Customizing Tool Versions
