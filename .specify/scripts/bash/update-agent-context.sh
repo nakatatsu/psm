@@ -724,44 +724,51 @@ print_summary() {
 #==============================================================================
 
 main() {
-    # Validate environment before proceeding
-    validate_environment
-    
-    log_info "=== Updating agent context files for feature $CURRENT_BRANCH ==="
-    
-    # Parse the plan file to extract project information
-    if ! parse_plan_data "$NEW_PLAN"; then
-        log_error "Failed to parse plan data"
-        exit 1
-    fi
-    
-    # Process based on agent type argument
-    local success=true
-    
-    if [[ -z "$AGENT_TYPE" ]]; then
-        # No specific agent provided - update all existing agent files
-        log_info "No agent specified, updating all existing agent files..."
-        if ! update_all_existing_agents; then
-            success=false
-        fi
-    else
-        # Specific agent provided - update only that agent
-        log_info "Updating specific agent: $AGENT_TYPE"
-        if ! update_specific_agent "$AGENT_TYPE"; then
-            success=false
-        fi
-    fi
-    
-    # Print summary
-    print_summary
-    
-    if [[ "$success" == true ]]; then
-        log_success "Agent context update completed successfully"
-        exit 0
-    else
-        log_error "Agent context update completed with errors"
-        exit 1
-    fi
+    # DISABLED: This script only appends tech-stack lines to CLAUDE.md (and similar
+    # agent files), which causes merge conflicts across feature branches and
+    # duplicates information already present in the Active Technologies section.
+    # The rest of the script is left intact for reference.
+    log_info "update-agent-context.sh is disabled (no-op). See comment in main()."
+    exit 0
+
+    # # Validate environment before proceeding
+    # validate_environment
+    #
+    # log_info "=== Updating agent context files for feature $CURRENT_BRANCH ==="
+    #
+    # # Parse the plan file to extract project information
+    # if ! parse_plan_data "$NEW_PLAN"; then
+    #     log_error "Failed to parse plan data"
+    #     exit 1
+    # fi
+    #
+    # # Process based on agent type argument
+    # local success=true
+    #
+    # if [[ -z "$AGENT_TYPE" ]]; then
+    #     # No specific agent provided - update all existing agent files
+    #     log_info "No agent specified, updating all existing agent files..."
+    #     if ! update_all_existing_agents; then
+    #         success=false
+    #     fi
+    # else
+    #     # Specific agent provided - update only that agent
+    #     log_info "Updating specific agent: $AGENT_TYPE"
+    #     if ! update_specific_agent "$AGENT_TYPE"; then
+    #         success=false
+    #     fi
+    # fi
+    #
+    # # Print summary
+    # print_summary
+    #
+    # if [[ "$success" == true ]]; then
+    #     log_success "Agent context update completed successfully"
+    #     exit 0
+    # else
+    #     log_error "Agent context update completed with errors"
+    #     exit 1
+    # fi
 }
 
 # Execute main function if script is run directly
