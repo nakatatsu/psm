@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"regexp"
@@ -145,6 +147,7 @@ func testIOStreams(stdin string, isTerminal bool) (*IOStreams, *bytes.Buffer, *b
 		Stdout:     stdout,
 		Stderr:     stderr,
 		IsTerminal: func() bool { return isTerminal },
+		TtyOpener:  func() (io.ReadCloser, error) { return nil, fmt.Errorf("no tty in test") },
 	}, stdout, stderr
 }
 
@@ -257,11 +260,32 @@ func TestRunSyncApproveFlow(t *testing.T) {
 		}
 	})
 
-	t.Run("non-terminal without skip-approve declines", func(t *testing.T) {
+	t.Run("non-terminal with tty approves via tty", func(t *testing.T) {
 		s := newFakeStoreWithExisting(map[string]string{"/app/key1": "oldval"})
-		io, _, _ := testIOStreams("", false) // not a terminal
+		streams, stdout, _ := testIOStreams("", false) // stdin is not a terminal
+		streams.TtyOpener = fakeTtyOpener("y\n")
 		cfg := Config{File: syncFile}
-		code, err := runSync(ctx, cfg, s, io)
+		code, err := runSync(ctx, cfg, s, streams)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if code != 0 {
+			t.Errorf("exit code = %d, want 0", code)
+		}
+		if !strings.Contains(stdout.String(), "update: /app/key1") {
+			t.Errorf("stdout missing update line: %s", stdout.String())
+		}
+		if s.puts["/app/key1"] != "newval" {
+			t.Error("expected store.Put to be called with new value")
+		}
+	})
+
+	t.Run("non-terminal with tty declines via tty", func(t *testing.T) {
+		s := newFakeStoreWithExisting(map[string]string{"/app/key1": "oldval"})
+		streams, _, _ := testIOStreams("", false) // stdin is not a terminal
+		streams.TtyOpener = fakeTtyOpener("N\n")
+		cfg := Config{File: syncFile}
+		code, err := runSync(ctx, cfg, s, streams)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -269,9 +293,50 @@ func TestRunSyncApproveFlow(t *testing.T) {
 			t.Errorf("exit code = %d, want 0", code)
 		}
 		if len(s.puts) != 0 {
-			t.Error("store should not be called in non-terminal without --skip-approve")
+			t.Error("store should not be called when user declines via tty")
 		}
 	})
+
+	t.Run("non-terminal without tty returns error", func(t *testing.T) {
+		s := newFakeStoreWithExisting(map[string]string{"/app/key1": "oldval"})
+		streams, _, _ := testIOStreams("", false) // not a terminal, default TtyOpener returns error
+		cfg := Config{File: syncFile}
+		_, err := runSync(ctx, cfg, s, streams)
+		if err == nil {
+			t.Fatal("expected error when no tty available")
+		}
+		if !strings.Contains(err.Error(), "interactive mode requires a terminal") {
+			t.Errorf("error should mention interactive mode requires terminal: %v", err)
+		}
+		if len(s.puts) != 0 {
+			t.Error("store should not be called when no tty available")
+		}
+	})
+
+	t.Run("non-terminal with skip-approve proceeds without tty", func(t *testing.T) {
+		s := newFakeStoreWithExisting(map[string]string{"/app/key1": "oldval"})
+		streams, _, stderr := testIOStreams("", false)
+		cfg := Config{File: syncFile, SkipApprove: true}
+		code, err := runSync(ctx, cfg, s, streams)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if code != 0 {
+			t.Errorf("exit code = %d, want 0", code)
+		}
+		if s.puts["/app/key1"] != "newval" {
+			t.Error("expected store.Put to be called")
+		}
+		if strings.Contains(stderr.String(), "No terminal available") {
+			t.Error("no-terminal message should not appear with --skip-approve")
+		}
+	})
+}
+
+func fakeTtyOpener(input string) func() (io.ReadCloser, error) {
+	return func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(input)), nil
+	}
 }
 
 func newFakeStoreWithExisting(existing map[string]string) *fakeStore {
