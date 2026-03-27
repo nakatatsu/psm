@@ -32,6 +32,7 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 	})))
+	slog.Debug("debug logging enabled")
 
 	exitCode, err := run(cfg)
 	if err != nil {

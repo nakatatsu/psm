@@ -31,6 +31,6 @@
     }
   },
   "remoteUser": "node",
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && bash /workspace/.devcontainer/setup-aws-config.sh && git config --local worktree.useRelativePaths true && claude plugin install skill-creator@claude-plugins-official --scope user && claude plugin install code-review@claude-plugins-official --scope project",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && bash /workspace/.devcontainer/setup-aws-config.sh && git config --local worktree.useRelativePaths true",
   "waitFor": "postStartCommand"
 }
