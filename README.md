@@ -13,12 +13,11 @@ Download prebuilt binaries from [GitHub Releases](https://github.com/nakatatsu/p
 ### Sync: push YAML to AWS
 
 ```bash
-psm sync --store ssm [--profile <name>] [--dry-run] [--skip-approve] [--debug] [--delete <file>] <sync-file>
+psm sync [--profile <name>] [--dry-run] [--skip-approve] [--debug] [--delete <file>] <sync-file>
 ```
 
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--store ssm` | Yes | Target store: `ssm` (Parameter Store) |
 | `--profile <name>` | No | AWS profile name (default: SDK default credentials) |
 | `--dry-run` | No | Show planned changes without executing or prompting |
 | `--skip-approve` | No | Skip approval prompt and execute immediately (for CI/automation) |
@@ -29,16 +28,16 @@ By default, `psm sync` displays the action plan and asks for confirmation before
 
 ```bash
 # Preview changes (no prompt, no execution)
-psm sync --store ssm --dry-run secrets.yaml
+psm sync --dry-run secrets.yaml
 
 # Apply changes (displays plan, asks for approval)
-psm sync --store ssm secrets.yaml
+psm sync secrets.yaml
 
 # Apply with a specific AWS profile
-psm sync --store ssm --profile myprofile secrets.yaml
+psm sync --profile myprofile secrets.yaml
 
 # Skip approval (for CI/CD pipelines)
-psm sync --store ssm --skip-approve secrets.yaml
+psm sync --skip-approve secrets.yaml
 ```
 
 > When stdin is piped, the approval prompt reads from `/dev/tty` (the controlling terminal), so interactive approval works even with piped input. If the approval prompt is needed but no terminal is available (e.g., cron, headless CI), the tool exits with an error. Use `--skip-approve` for non-interactive environments.
@@ -54,7 +53,7 @@ To delete obsolete AWS keys, create a YAML file listing regex patterns and pass 
 ```
 
 ```bash
-psm sync --store ssm --delete needless.yml secrets.yaml
+psm sync --delete needless.yml secrets.yaml
 ```
 
 Only keys matching the patterns **and not present in the sync YAML** are deleted. The sync file is always required with `--delete`.
@@ -69,11 +68,11 @@ Only keys matching the patterns **and not present in the sync YAML** are deleted
 ### Export: pull AWS parameters to YAML
 
 ```bash
-psm export --store ssm [--profile <name>] [--debug] <file>
+psm export [--profile <name>] [--debug] <file>
 ```
 
 ```bash
-psm export --store ssm output.yaml
+psm export output.yaml
 ```
 
 ### With SOPS (encrypted secrets)
@@ -81,9 +80,9 @@ psm export --store ssm output.yaml
 Decrypt with SOPS and pipe directly to psm:
 
 ```bash
-sops -d secrets.enc.yaml | psm sync --store ssm --dry-run /dev/stdin
-sops -d secrets.enc.yaml | psm sync --store ssm /dev/stdin          # interactive approval via /dev/tty
-sops -d secrets.enc.yaml | psm sync --store ssm --skip-approve /dev/stdin  # CI/CD (no prompt)
+sops -d secrets.enc.yaml | psm sync --dry-run /dev/stdin
+sops -d secrets.enc.yaml | psm sync /dev/stdin                      # interactive approval via /dev/tty
+sops -d secrets.enc.yaml | psm sync --skip-approve /dev/stdin       # CI/CD (no prompt)
 ```
 
 > The approval prompt reads from `/dev/tty` when stdin is piped, so you can approve interactively. Use `--skip-approve` for fully automated pipelines.

@@ -13,54 +13,44 @@ func TestParseArgs(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "sync with ssm",
-			args: []string{"psm", "sync", "--store", "ssm", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "ssm", File: "file.yaml"},
-		},
-		{
-			name:    "sync with sm is invalid",
-			args:    []string{"psm", "sync", "--store", "sm", "--profile", "prod", "file.yaml"},
-			wantErr: true,
+			name: "sync basic",
+			args: []string{"psm", "sync", "file.yaml"},
+			want: Config{Subcommand: "sync", File: "file.yaml"},
 		},
 		{
 			name: "sync with dry-run",
-			args: []string{"psm", "sync", "--store", "ssm", "--dry-run", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "ssm", DryRun: true, File: "file.yaml"},
+			args: []string{"psm", "sync", "--dry-run", "file.yaml"},
+			want: Config{Subcommand: "sync", DryRun: true, File: "file.yaml"},
 		},
 		{
 			name: "sync with skip-approve",
-			args: []string{"psm", "sync", "--store", "ssm", "--skip-approve", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "ssm", SkipApprove: true, File: "file.yaml"},
+			args: []string{"psm", "sync", "--skip-approve", "file.yaml"},
+			want: Config{Subcommand: "sync", SkipApprove: true, File: "file.yaml"},
 		},
 		{
 			name: "sync with debug",
-			args: []string{"psm", "sync", "--store", "ssm", "--debug", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "ssm", Debug: true, File: "file.yaml"},
+			args: []string{"psm", "sync", "--debug", "file.yaml"},
+			want: Config{Subcommand: "sync", Debug: true, File: "file.yaml"},
 		},
 		{
 			name: "sync with delete file",
-			args: []string{"psm", "sync", "--store", "ssm", "--delete", "needless.yml", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "ssm", DeleteFile: "needless.yml", File: "file.yaml"},
+			args: []string{"psm", "sync", "--delete", "needless.yml", "file.yaml"},
+			want: Config{Subcommand: "sync", DeleteFile: "needless.yml", File: "file.yaml"},
 		},
 		{
 			name: "sync all flags combined",
-			args: []string{"psm", "sync", "--store", "ssm", "--dry-run", "--skip-approve", "--debug", "--delete", "del.yml", "file.yaml"},
-			want: Config{Subcommand: "sync", Store: "ssm", DryRun: true, SkipApprove: true, Debug: true, DeleteFile: "del.yml", File: "file.yaml"},
+			args: []string{"psm", "sync", "--dry-run", "--skip-approve", "--debug", "--delete", "del.yml", "file.yaml"},
+			want: Config{Subcommand: "sync", DryRun: true, SkipApprove: true, Debug: true, DeleteFile: "del.yml", File: "file.yaml"},
 		},
 		{
-			name: "export with ssm",
-			args: []string{"psm", "export", "--store", "ssm", "out.yaml"},
-			want: Config{Subcommand: "export", Store: "ssm", File: "out.yaml"},
-		},
-		{
-			name:    "export with sm is invalid",
-			args:    []string{"psm", "export", "--store", "sm", "--profile", "staging", "out.yaml"},
-			wantErr: true,
+			name: "export basic",
+			args: []string{"psm", "export", "out.yaml"},
+			want: Config{Subcommand: "export", File: "out.yaml"},
 		},
 		{
 			name: "export with debug",
-			args: []string{"psm", "export", "--store", "ssm", "--debug", "out.yaml"},
-			want: Config{Subcommand: "export", Store: "ssm", Debug: true, File: "out.yaml"},
+			args: []string{"psm", "export", "--debug", "out.yaml"},
+			want: Config{Subcommand: "export", Debug: true, File: "out.yaml"},
 		},
 		{
 			name:    "no subcommand",
@@ -73,33 +63,28 @@ func TestParseArgs(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "sync no store flag",
-			args:    []string{"psm", "sync", "file.yaml"},
-			wantErr: true,
-		},
-		{
-			name:    "sync invalid store value",
-			args:    []string{"psm", "sync", "--store", "dynamodb", "file.yaml"},
-			wantErr: true,
-		},
-		{
 			name:    "sync no file arg",
-			args:    []string{"psm", "sync", "--store", "ssm"},
+			args:    []string{"psm", "sync"},
 			wantErr: true,
 		},
 		{
 			name:    "export no file arg",
-			args:    []string{"psm", "export", "--store", "ssm"},
-			wantErr: true,
-		},
-		{
-			name:    "export no store flag",
-			args:    []string{"psm", "export", "out.yaml"},
+			args:    []string{"psm", "export"},
 			wantErr: true,
 		},
 		{
 			name:    "prune flag removed",
-			args:    []string{"psm", "sync", "--store", "ssm", "--prune", "file.yaml"},
+			args:    []string{"psm", "sync", "--prune", "file.yaml"},
+			wantErr: true,
+		},
+		{
+			name:    "store flag removed with ssm",
+			args:    []string{"psm", "sync", "--store", "ssm", "file.yaml"},
+			wantErr: true,
+		},
+		{
+			name:    "store flag removed with sm",
+			args:    []string{"psm", "export", "--store", "sm", "out.yaml"},
 			wantErr: true,
 		},
 		{

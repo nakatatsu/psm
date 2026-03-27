@@ -254,7 +254,7 @@ cleanup_all
 echo "=== Scenario 1/${SCENARIO_TOTAL}: Dry-run ==="
 
 stdout=$( (cd "${TMPDIR_TEST}" && sops -d secrets.enc.yaml) | \
-  ${PSM} sync --store ssm ${PROFILE_FLAG} --dry-run /dev/stdin )
+  ${PSM} sync ${PROFILE_FLAG} --dry-run /dev/stdin )
 echo "${stdout}"
 
 if ! echo "${stdout}" | grep -q "(dry-run)"; then
@@ -273,7 +273,7 @@ echo "=== Scenario 2/${SCENARIO_TOTAL}: Sync with --skip-approve ==="
 
 exit_code=0
 (cd "${TMPDIR_TEST}" && sops -d secrets.enc.yaml) | \
-  ${PSM} sync --store ssm ${PROFILE_FLAG} --skip-approve /dev/stdin || exit_code=$?
+  ${PSM} sync ${PROFILE_FLAG} --skip-approve /dev/stdin || exit_code=$?
 
 if [[ ${exit_code} -ne 0 ]]; then
   fail "exit code ${exit_code}, expected 0"
@@ -293,7 +293,7 @@ echo "=== Scenario 3/${SCENARIO_TOTAL}: Delete with --delete ==="
 put_param "/myapp/legacy/old-key" "to-be-deleted"
 
 exit_code=0
-${PSM} sync --store ssm ${PROFILE_FLAG} --skip-approve \
+${PSM} sync ${PROFILE_FLAG} --skip-approve \
   --delete "${TMPDIR_TEST}/delete-patterns.yaml" \
   "${TEST_YAML}" || exit_code=$?
 
@@ -313,7 +313,7 @@ echo "=== Scenario 4/${SCENARIO_TOTAL}: Conflict detection ==="
 
 # Capture state before conflict attempt
 exit_code=0
-${PSM} sync --store ssm ${PROFILE_FLAG} --skip-approve \
+${PSM} sync ${PROFILE_FLAG} --skip-approve \
   --delete "${TMPDIR_TEST}/conflict-patterns.yaml" \
   "${TEST_YAML}" 2>&1 || exit_code=$?
 
@@ -332,12 +332,12 @@ echo ""
 echo "=== Scenario 5/${SCENARIO_TOTAL}: Debug logging ==="
 
 # 5a: --debug produces level=DEBUG
-output_debug=$(${PSM} sync --store ssm ${PROFILE_FLAG} --debug --dry-run \
+output_debug=$(${PSM} sync ${PROFILE_FLAG} --debug --dry-run \
   "${TEST_YAML}" 2>&1)
 echo "${output_debug}"
 
 # 5b: without --debug, level=DEBUG must NOT appear
-output_normal=$(${PSM} sync --store ssm ${PROFILE_FLAG} --dry-run \
+output_normal=$(${PSM} sync ${PROFILE_FLAG} --dry-run \
   "${TEST_YAML}" 2>&1)
 
 if ! echo "${output_debug}" | grep -q "level=DEBUG"; then
@@ -360,7 +360,7 @@ put_param "/myapp/database/host" "original-value"
 # Pipe input without --skip-approve -> stdin is not a terminal -> auto-decline
 exit_code=0
 cat "${TEST_YAML}" | \
-  ${PSM} sync --store ssm ${PROFILE_FLAG} /dev/stdin || exit_code=$?
+  ${PSM} sync ${PROFILE_FLAG} /dev/stdin || exit_code=$?
 
 val=$(get_param "/myapp/database/host" || echo "")
 if [[ "${val}" == "original-value" ]]; then
@@ -384,7 +384,7 @@ put_param "/myapp/database/port" "5432"
 put_param "/myapp/database/password" "do-not-look-at-me"
 put_param "/myapp/api/key" "come-on-do-not-look-at-me"
 
-stdout=$(${PSM} sync --store ssm ${PROFILE_FLAG} --skip-approve \
+stdout=$(${PSM} sync ${PROFILE_FLAG} --skip-approve \
   "${TEST_YAML}")
 
 if ! echo "${stdout}" | grep -q "0 created, 0 updated, 0 deleted"; then
@@ -402,7 +402,7 @@ echo ""
 echo "=== Scenario 8/${SCENARIO_TOTAL}: Missing file ==="
 
 exit_code=0
-${PSM} sync --store ssm ${PROFILE_FLAG} --skip-approve \
+${PSM} sync ${PROFILE_FLAG} --skip-approve \
   "/nonexistent/path/secrets.yaml" 2>/dev/null || exit_code=$?
 
 if [[ ${exit_code} -eq 0 ]]; then
@@ -425,7 +425,7 @@ invalid: [broken
 INVALEOF
 
 exit_code=0
-${PSM} sync --store ssm ${PROFILE_FLAG} --skip-approve \
+${PSM} sync ${PROFILE_FLAG} --skip-approve \
   "${TMPDIR_TEST}/invalid.yaml" 2>/dev/null || exit_code=$?
 
 if [[ ${exit_code} -eq 0 ]]; then
@@ -443,7 +443,7 @@ echo ""
 echo "=== Scenario 10/${SCENARIO_TOTAL}: Empty input ==="
 
 exit_code=0
-${PSM} sync --store ssm ${PROFILE_FLAG} --skip-approve \
+${PSM} sync ${PROFILE_FLAG} --skip-approve \
   /dev/null 2>/dev/null || exit_code=$?
 
 if [[ ${exit_code} -eq 0 ]]; then
@@ -468,7 +468,7 @@ else
 
   # script creates a pseudo-TTY; pipe "y" to approve
   exit_code=0
-  printf 'y\n' | script -qec "${PSM} sync --store ssm ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
+  printf 'y\n' | script -qec "${PSM} sync ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
     || exit_code=$?
 
   if ! assert_state "TTY yes: sync applied" "${EXPECTED_FULL_STATE[@]}"; then
@@ -492,7 +492,7 @@ else
 
   # script creates a pseudo-TTY; pipe "n" to decline
   exit_code=0
-  printf 'n\n' | script -qec "${PSM} sync --store ssm ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
+  printf 'n\n' | script -qec "${PSM} sync ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
     || exit_code=$?
 
   val=$(get_param "/myapp/database/host" || echo "")
@@ -500,7 +500,7 @@ else
     fail "approve no should not change state, but /myapp/database/host='${val}'"
   else
     # Also test empty input (just Enter) -> should decline (default N)
-    printf '\n' | script -qec "${PSM} sync --store ssm ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
+    printf '\n' | script -qec "${PSM} sync ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
       || true
 
     val2=$(get_param "/myapp/database/host" || echo "")

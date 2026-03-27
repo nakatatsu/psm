@@ -59,11 +59,7 @@ func run(cfg Config) (int, error) {
 		return 1, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	var store Store
-	switch cfg.Store {
-	case "ssm":
-		store = NewSSMStore(awsCfg)
-	}
+	store := NewSSMStore(awsCfg)
 
 	switch cfg.Subcommand {
 	case "sync":
@@ -195,7 +191,6 @@ func parseArgs(args []string) (Config, error) {
 	fs := flag.NewFlagSet(sub, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	store := fs.String("store", "", "store type: ssm")
 	profile := fs.String("profile", "", "AWS profile name")
 
 	var dryRun, skipApprove, debug bool
@@ -207,10 +202,13 @@ func parseArgs(args []string) (Config, error) {
 	}
 	fs.BoolVar(&debug, "debug", false, "enable debug logging")
 
-	// Detect removed --prune flag before parsing
+	// Detect removed flags before parsing
 	for _, arg := range args[2:] {
 		if arg == "--prune" {
 			return Config{}, fmt.Errorf("--prune has been removed. Use --delete <file> with regex patterns instead")
+		}
+		if arg == "--store" {
+			return Config{}, fmt.Errorf("--store has been removed. SSM is now the default store. Remove --store from your command")
 		}
 	}
 
@@ -218,21 +216,13 @@ func parseArgs(args []string) (Config, error) {
 		return Config{}, fmt.Errorf("usage: psm %s [flags] <file>", sub)
 	}
 
-	if *store == "" {
-		return Config{}, fmt.Errorf("--store is required. usage: psm %s --store ssm [flags] <file>", sub)
-	}
-	if *store != "ssm" {
-		return Config{}, fmt.Errorf("invalid --store value %q: must be ssm", *store)
-	}
-
 	remaining := fs.Args()
 	if len(remaining) != 1 {
-		return Config{}, fmt.Errorf("exactly one file argument required. usage: psm %s --store ssm [flags] <file>", sub)
+		return Config{}, fmt.Errorf("exactly one file argument required. usage: psm %s [flags] <file>", sub)
 	}
 
 	return Config{
 		Subcommand:  sub,
-		Store:       *store,
 		Profile:     *profile,
 		DryRun:      dryRun,
 		SkipApprove: skipApprove,
