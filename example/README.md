@@ -91,7 +91,7 @@ export SOPS_AGE_KEY_FILE=$(pwd)/age-key.txt
 No prompt, no execution — just shows what would happen:
 
 ```bash
-sops -d secrets.enc.yaml | psm sync --store ssm --profile <your-profile> --dry-run /dev/stdin
+sops -d secrets.enc.yaml | psm sync --profile <your-profile> --dry-run /dev/stdin
 
 # (dry-run) create: /myapp/prod/NEW_KEY
 # (dry-run) update: /myapp/prod/CHANGED_KEY
@@ -103,7 +103,7 @@ sops -d secrets.enc.yaml | psm sync --store ssm --profile <your-profile> --dry-r
 Displays the action plan and prompts for confirmation before executing:
 
 ```bash
-sops -d secrets.enc.yaml | psm sync --store ssm --profile <your-profile> --skip-approve /dev/stdin
+sops -d secrets.enc.yaml | psm sync --profile <your-profile> --skip-approve /dev/stdin
 
 # create: /myapp/prod/NEW_KEY
 # update: /myapp/prod/CHANGED_KEY
@@ -118,7 +118,7 @@ sops -d secrets.enc.yaml | psm sync --store ssm --profile <your-profile> --skip-
 For non-interactive environments such as CI/CD pipelines, use `--skip-approve`:
 
 ```bash
-psm sync --store ssm --skip-approve secrets.yaml
+psm sync --skip-approve secrets.yaml
 ```
 
 ### 7. Delete obsolete keys
@@ -132,7 +132,7 @@ Create a YAML file listing regex patterns for keys to delete:
 ```
 
 ```bash
-sops -d secrets.enc.yaml | psm sync --store ssm --profile <your-profile> --skip-approve --delete needless.yml /dev/stdin
+sops -d secrets.enc.yaml | psm sync --profile <your-profile> --skip-approve --delete needless.yml /dev/stdin
 ```
 
 Only keys matching the patterns **and not present in the sync YAML** are deleted.
@@ -150,7 +150,7 @@ Only keys matching the patterns **and not present in the sync YAML** are deleted
 Add `--debug` to any command to see detailed slog output on stderr:
 
 ```bash
-psm sync --store ssm --debug secrets.yaml
+psm sync --debug secrets.yaml
 
 # stderr:
 # time=... level=DEBUG msg="API call" operation=GetParametersByPath path=/
@@ -180,13 +180,12 @@ Rebuild the DevContainer with custom versions:
 ## CLI Reference
 
 ```bash
-psm sync --store <ssm|sm> [--profile <name>] [--dry-run] [--skip-approve] [--debug] [--delete <file>] <sync-file>
-psm export --store <ssm|sm> [--profile <name>] [--debug] <file>
+psm sync [--profile <name>] [--dry-run] [--skip-approve] [--debug] [--delete <file>] <sync-file>
+psm export [--profile <name>] [--debug] <file>
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--store <ssm\|sm>` | **(Required)** Target store: `ssm` (Parameter Store) or `sm` (Secrets Manager) |
 | `--profile <name>` | AWS profile name (default: SDK default credentials) |
 | `--dry-run` | Show planned changes without executing or prompting |
 | `--skip-approve` | Skip approval prompt and execute immediately |

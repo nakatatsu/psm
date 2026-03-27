@@ -33,7 +33,6 @@ func (a ActionType) String() string {
 // Config holds CLI flags and arguments.
 type Config struct {
 	Subcommand  string
-	Store       string
 	Profile     string
 	DryRun      bool
 	SkipApprove bool
