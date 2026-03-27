@@ -79,4 +79,5 @@ type IOStreams struct {
 	Stdout     io.Writer
 	Stderr     io.Writer
 	IsTerminal func() bool
+	TtyOpener  func() (io.ReadCloser, error)
 }

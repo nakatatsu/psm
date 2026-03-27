@@ -63,6 +63,19 @@ func printSummary(actions []Action, dryRun bool, stdout io.Writer) {
 		created, updated, deleted, unchanged, suffix)
 }
 
+// approve handles the approval flow, selecting the appropriate input source.
+func approve(streams *IOStreams) (bool, error) {
+	if streams.IsTerminal() {
+		return promptApprove(streams.Stdin, streams.Stderr), nil
+	}
+	tty, err := streams.TtyOpener()
+	if err != nil {
+		return false, fmt.Errorf("interactive mode requires a terminal but /dev/tty is not available")
+	}
+	defer func() { _ = tty.Close() }()
+	return promptApprove(tty, streams.Stderr), nil
+}
+
 // promptApprove asks the user for confirmation. Returns true only for "y" or "Y".
 func promptApprove(reader io.Reader, writer io.Writer) bool {
 	fmt.Fprint(writer, "Proceed? [y/N] ")

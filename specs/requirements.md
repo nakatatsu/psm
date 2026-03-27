@@ -98,7 +98,8 @@ psm export --store ssm [--profile <name>] [--debug] <file>
 - `--skip-approve` でプロンプトをスキップし即時実行
 - `--dry-run` ではプロンプトを表示しない
 - 変更がない場合（全件 skip）はプロンプトを表示しない
-- stdin が端末でない場合（パイプ入力）かつ `--skip-approve` 未指定時は自動的に拒否（終了コード 0）
+- stdin が端末でない場合（パイプ入力）、承認プロンプトは `/dev/tty` から読み取る（Unix 標準パターン: `rm -i`, `git add -p` と同様）
+- 承認プロンプトが必要な状態（`--skip-approve` 未指定）で `/dev/tty` が利用できない場合はエラー終了（終了コード 1）
 
 ### 3.4 Dry-run
 
@@ -111,7 +112,8 @@ psm export --store ssm [--profile <name>] [--debug] <file>
 
 - YAML 内の `sops` キー（SOPS メタデータ）は自動的に除外
 - psm 自体は復号を行わない（事前に SOPS で復号された入力を想定）
-- パイプで連携: `sops -d secrets.enc.yaml | psm sync --store ssm --skip-approve /dev/stdin`
+- パイプで連携: `sops -d secrets.enc.yaml | psm sync --store ssm /dev/stdin`（承認プロンプトは `/dev/tty` 経由で対話的に動作）
+- CI/CD などの非インタラクティブ環境では: `sops -d secrets.enc.yaml | psm sync --store ssm --skip-approve /dev/stdin`
 
 ### 3.6 Debug Logging
 
@@ -179,7 +181,7 @@ delete: /myapp/legacy/OLD_KEY
 |------|-----------|
 | 0 | 全件成功 |
 | 0 | 承認プロンプトで拒否 |
-| 0 | 非端末 stdin かつ `--skip-approve` 未指定（自動拒否） |
+| 1 | 承認プロンプト必要だが `/dev/tty` 利用不可 |
 | 1 | CLI 引数の不正 |
 | 1 | YAML バリデーションエラー |
 | 1 | 削除パターンの正規表現不正 |

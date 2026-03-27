@@ -41,7 +41,7 @@ psm sync --store ssm --profile myprofile secrets.yaml
 psm sync --store ssm --skip-approve secrets.yaml
 ```
 
-> When stdin is not a terminal (e.g., piped input) and `--skip-approve` is not set, the tool automatically declines and exits without changes.
+> When stdin is piped, the approval prompt reads from `/dev/tty` (the controlling terminal), so interactive approval works even with piped input. If the approval prompt is needed but no terminal is available (e.g., cron, headless CI), the tool exits with an error. Use `--skip-approve` for non-interactive environments.
 
 ### Deleting keys
 
@@ -82,10 +82,11 @@ Decrypt with SOPS and pipe directly to psm:
 
 ```bash
 sops -d secrets.enc.yaml | psm sync --store ssm --dry-run /dev/stdin
-sops -d secrets.enc.yaml | psm sync --store ssm --skip-approve /dev/stdin
+sops -d secrets.enc.yaml | psm sync --store ssm /dev/stdin          # interactive approval via /dev/tty
+sops -d secrets.enc.yaml | psm sync --store ssm --skip-approve /dev/stdin  # CI/CD (no prompt)
 ```
 
-> Note: When piping, stdin is not a terminal, so `--skip-approve` is required to execute changes.
+> The approval prompt reads from `/dev/tty` when stdin is piped, so you can approve interactively. Use `--skip-approve` for fully automated pipelines.
 
 See [example/README.md](example/README.md) for a full walkthrough including key generation and encryption setup.
 

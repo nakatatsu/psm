@@ -74,6 +74,7 @@ func run(cfg Config) (int, error) {
 			Stdout:     os.Stdout,
 			Stderr:     os.Stderr,
 			IsTerminal: func() bool { return isTerminal },
+			TtyOpener:  func() (io.ReadCloser, error) { return os.Open("/dev/tty") },
 		}
 		return runSync(ctx, cfg, store, streams)
 	case "export":
@@ -160,10 +161,11 @@ func runSync(ctx context.Context, cfg Config, store Store, io *IOStreams) (int, 
 
 	// Approval flow
 	if !cfg.SkipApprove {
-		if !io.IsTerminal() {
-			return 0, nil
+		approved, err := approve(io)
+		if err != nil {
+			return 0, err
 		}
-		if !promptApprove(io.Stdin, io.Stderr) {
+		if !approved {
 			return 0, nil
 		}
 	}
