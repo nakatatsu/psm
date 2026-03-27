@@ -80,7 +80,7 @@ func TestExportRoundTrip(t *testing.T) {
 	tmpFile := "/tmp/psm-export-roundtrip.yaml"
 	defer func() { _ = os.Remove(tmpFile) }()
 
-	exportCfg := Config{File: tmpFile, Store: "ssm"}
+	exportCfg := Config{File: tmpFile}
 	code, err := runExport(ctx, exportCfg, store)
 	if err != nil {
 		t.Fatalf("export failed: %v", err)
