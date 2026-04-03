@@ -1,129 +1,128 @@
-# psm — Behavioral Requirements
+# psm — 要件定義
 
-> アプリケーションの挙動に関する要件をまとめたドキュメント。コード・仕様書・テストから検証済みの事実のみを記載。(2026-03-25)
+AWS SSM Parameter Store に保存するパラメータをYAMLファイルで一括管理するためのCLIツール
 
-## 1. Commands
+## 1. psm が解決する課題
 
-### 1.1 sync
+AWS SSM Parameter Store に保存する大量のパラメータを手動で管理するのは困難が大きい。汎用のIaCツールも、機密情報を含むパラメータの管理では差分確認や状態ファイルの取り扱いに注意が必要になる。
+そこでYAMLファイルを用いてSSMの実際の状態との差分を検出・適用できるツールを作成した。
 
-YAML ファイルの内容を AWS SSM Parameter Store に同期する。
+- **宣言的な管理**: YAML に書いたものが SSM の状態になる
+- **既存環境の取り込み**: SSM の現状を YAML にエクスポートできる
+- **SOPS との連携によるセキュアな管理**: YAMLはSOPSにより暗号化してGitなどに保存する
 
-```
-psm sync --store ssm [--profile <name>] [--dry-run] [--skip-approve] [--debug] [--delete <file>] <sync-file>
-```
+## 2. コマンド
 
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--store ssm` | Yes | ストア種別（`ssm` のみ有効） |
-| `--profile <name>` | No | AWS プロファイル名（未指定時は SDK デフォルト認証） |
-| `--dry-run` | No | 変更計画を表示するのみ。プロンプトも実行も行わない |
-| `--skip-approve` | No | 承認プロンプトをスキップして即時実行 |
-| `--debug` | No | Debug レベルのログを stderr に出力 |
-| `--delete <file>` | No | 削除対象の正規表現パターンを含む YAML ファイル |
+### 2.1 sync
 
-**処理フロー**:
-
-1. YAML ファイルを読み込み、エントリをパース・バリデーション
-2. AWS SSM から既存パラメータを全件取得
-3. YAML と既存パラメータを比較し、アクションプラン（create/update/skip）を生成
-4. `--delete` 指定時は削除パターンを処理し、アクションプランに delete を追加
-5. アクションプランを stdout に表示
-6. 承認プロンプトを表示（条件による — 3.3 参照）
-7. 変更を実行
-
-### 1.2 export
-
-AWS SSM Parameter Store の全パラメータを YAML ファイルとして書き出す。
+YAML ファイルに記載されたキーと値を SSM Parameter Store に同期する。既に同じ値が登録されているキーはスキップし、差分があるものだけを作成・更新する。
 
 ```
-psm export --store ssm [--profile <name>] [--debug] <file>
+psm sync [--profile <name>] [--dry-run] [--skip-approve] [--debug] [--delete <file>] <sync-file>
 ```
 
-- 出力ファイルが既に存在する場合はエラー（上書き禁止）
-- パラメータが 0 件の場合はエラー
-- キーはアルファベット順にソート
-- 値はダブルクォート形式
-- ファイル権限は `0600`
-- export した YAML をそのまま sync すると差分 0 件（ラウンドトリップ互換）
+| フラグ             | 必須 | 用途                                                     |
+| ------------------ | ---- | -------------------------------------------------------- |
+| `--profile <name>` | No   | 使用する AWS プロファイル。省略時は SDK のデフォルト認証 |
+| `--dry-run`        | No   | 変更内容を表示するだけで実行しない                       |
+| `--skip-approve`   | No   | 承認プロンプトをスキップして即実行（CI/CD 向け）         |
+| `--debug`          | No   | 詳細なデバッグログを表示                                 |
+| `--delete <file>`  | No   | 条件を指定したファイルを元にキーを削除（後述）           |
 
-## 2. CLI Validation
+### 2.1.1 --version
 
-以下の条件でエラー（終了コード 1）:
+ビルドバージョンを表示して終了する。
 
-- サブコマンド未指定または不正な値
-- `--store` フラグ未指定
-- `--store` に `ssm` 以外の値を指定（`sm` を含む）
-- `--prune` フラグを指定（削除済み。`--delete <file>` を案内するエラーメッセージ）
-- ファイル引数が 0 個または 2 個以上
+```
+psm --version
+```
 
-環境変数 `AWS_PROFILE` は常に無視される（`--profile` フラグのみ有効）。
+### 2.2 export
 
-## 3. Features
+SSM Parameter Store の全パラメータを YAML ファイルとして書き出す。既存環境を psm 管理下に移行する際の起点として使う。
 
-### 3.1 Sync（作成・更新）
+```
+psm export [--profile <name>] [--debug] <file>
+```
 
-- YAML のキー名がそのまま SSM パラメータ名になる（パス構造の組み立てはしない）
-- 型は常に `SecureString`、`Overwrite=true` で upsert
-- 同期前に既存値を取得し比較。値が同一のキーは操作も表示もしない（skip）
-- YAML の非文字列値（整数、ブール値、浮動小数点数）は文字列に自動変換
-- 最大 10 並行で Put 操作を実行（固定値、設定不可）
-- 個別キーの失敗時も残りの処理を続行（部分失敗許容）
-- 失敗したキーは stderr にキー名とエラーメッセージを出力（値は含めない）
+- 出力ファイルが既に存在する場合はエラー（誤った上書きを防ぐ）
+- パラメータが 0 件の場合はエラー（空の export に意味がないため）
+- export した YAML をそのまま sync すると差分 0 件になる（ラウンドトリップ互換）
 
-### 3.2 Delete（パターンベース削除）
+## 3. 安全のための仕組み
 
-`--delete <file>` で削除対象の正規表現パターンを指定する。
+psm はシークレットを扱うツールであるため、誤操作や情報漏洩を防ぐ複数の安全策を備える。
 
-**削除パターンファイル形式**:
+### 3.1 承認フロー
+
+変更を実行する前に、ユーザーに確認を求める。
+
+- 変更内容を表示した後、`Proceed? [y/N]` プロンプトを表示
+- `y` または `Y` のみが承認。それ以外（Enter 含む）はすべてキャンセル
+- キャンセルしても終了コードは 0（変更なしは正常終了）
+- `--skip-approve` でプロンプトを省略（CI/CD パイプラインで使用）
+- `--dry-run` では承認プロンプトを表示しない（実行しないため不要）
+- 変更がない場合も承認プロンプトを表示しない（確認すべきことがないため）
+- パイプ入力時（stdin が端末でない場合）は、承認プロンプトを `/dev/tty` から読み取る（Unix 標準パターン: `rm -i`, `git add -p` と同様）
+- 承認プロンプトが必要な状態（`--skip-approve` 未指定）で `/dev/tty` が利用できない場合はエラー終了（終了コード 1）
+
+### 3.2 値の秘匿
+
+パラメータの**値**は、いかなる出力にも含めない（stdout、stderr、ログすべて）。表示されるのはキー名と操作種別（create/update/delete）のみ。
+
+### 3.3 export ファイルの保護
+
+export で生成するファイルの権限は `0600`（オーナーのみ読み書き可）に設定する。
+
+## 4. 不要キーの削除
+
+### 4.1 考え方
+
+sync は「YAML に書かれたキーを SSM に反映する」操作であり、YAML に書かれていないキーを自動的に削除はしない。不要なキーを明示的に削除するには `--delete` オプションを使う。やや煩雑であるが、一律でYAMLにないキーを削除するようにするとCI/CDの実行タイミングなどの問題で消すつもりのなかったキーを削除する恐れがあるためこのようにしている。
+
+### 4.2 削除パターンファイル
+
+削除対象を正規表現パターンで指定する YAML ファイルを用意する:
+
 ```yaml
 - "^/myapp/legacy/"
 - "^/myapp/deprecated-.*"
 ```
 
-**分類ロジック**:
-- **削除対象**: パターンにマッチし、かつ sync YAML に存在しないキー
-- **コンフリクト**: パターンにマッチし、かつ sync YAML にも存在するキー → 全操作を中止
-- **Unmanaged**: sync YAML に存在せず、パターンにもマッチしないキー → 警告表示（実行はブロックしない）
+```
+psm sync --delete needless.yml secrets.yaml
+```
 
-**安全機能**:
-- コンフリクト検出時は create/update/delete すべてを中止（all-or-nothing）。変更は一切行われない
-- 不正な正規表現は AWS 操作前にエラー
-- 削除は AWS API のバッチ処理（最大 10 件/リクエスト）
+### 4.3 削除の判定ルール
 
-### 3.3 Approval Flow（承認フロー）
+SSM 上の各キーは、sync YAML と削除パターンの両方と照合され、以下のように分類される:
 
-- デフォルトで変更前に `Proceed? [y/N]` プロンプトを stderr に表示
-- `y` または `Y` のみが承認（それ以外はすべて拒否）
-- 拒否した場合は終了コード 0（変更なし）
-- `--skip-approve` でプロンプトをスキップし即時実行
-- `--dry-run` ではプロンプトを表示しない
-- 変更がない場合（全件 skip）はプロンプトを表示しない
-- stdin が端末でない場合（パイプ入力）、承認プロンプトは `/dev/tty` から読み取る（Unix 標準パターン: `rm -i`, `git add -p` と同様）
-- 承認プロンプトが必要な状態（`--skip-approve` 未指定）で `/dev/tty` が利用できない場合はエラー終了（終了コード 1）
+| sync YAML にある | 削除パターンにマッチ | 判定                                              |
+| :--------------: | :------------------: | ------------------------------------------------- |
+|       Yes        |          No          | 通常の sync 対象（create/update/skip）            |
+|        No        |         Yes          | **削除対象**                                      |
+|       Yes        |         Yes          | **コンフリクト** → 全操作を中止                   |
+|        No        |          No          | 管理外キー → 警告を表示するが実行はブロックしない |
 
-### 3.4 Dry-run
+### 4.4 コンフリクト時の安全策
 
-- アクションプラン（create/update/delete）を stdout に表示
-- サマリー行に `(dry-run)` を付与
-- プロンプトは表示しない
-- AWS への変更は一切行わない
+sync YAML で管理しているキーが削除パターンにもマッチする場合、sync と delete の意図が矛盾する。この状態を検出すると、create・update・delete のすべてを実行せず中止する（all-or-nothing）。ユーザーはパターンか YAML を修正してから再実行する。
 
-### 3.5 SOPS 連携
+## 5. SOPS との連携
 
-- YAML 内の `sops` キー（SOPS メタデータ）は自動的に除外
-- psm 自体は復号を行わない（事前に SOPS で復号された入力を想定）
-- パイプで連携: `sops -d secrets.enc.yaml | psm sync --store ssm /dev/stdin`（承認プロンプトは `/dev/tty` 経由で対話的に動作）
-- CI/CD などの非インタラクティブ環境では: `sops -d secrets.enc.yaml | psm sync --store ssm --skip-approve /dev/stdin`
+psm 自体は復号機能を持たない。SOPS で暗号化された YAML は、パイプで復号しながら psm に渡す:
 
-### 3.6 Debug Logging
+```bash
+sops -d secrets.enc.yaml | psm sync /dev/stdin
+```
 
-- `--debug` フラグで Debug レベルのログを有効化（両サブコマンド共通）
-- デフォルトは Info レベル（Error + Warn + Info が表示。Debug は非表示）
-- ログは stderr に出力（`slog.TextHandler` 形式）
+> パイプ経由では stdin が端末でなくなるが、承認プロンプトは `/dev/tty` 経由で対話的に動作する。CI/CD などの非インタラクティブ環境では `--skip-approve` を指定する。
 
-## 4. Input/Output Format
+入力 YAML に SOPS メタデータ（`sops` キー）が含まれていた場合は自動的に除外する。SOPS のバージョンや使い方によってメタデータが残るケースがあるための防御的な処理であり、通常の `sops -d` パイプ利用では発動しない。
 
-### 4.1 入力 YAML（sync）
+## 6. 入力 YAML の形式
+
+キーが SSM パラメータ名、値がパラメータ値に対応するフラットな YAML:
 
 ```yaml
 /myapp/database/host: localhost
@@ -131,78 +130,61 @@ psm export --store ssm [--profile <name>] [--debug] <file>
 /myapp/api/key: my-secret-password
 ```
 
-**バリデーションルール**（AWS 通信前に一括実行）:
-- トップレベルはマッピングのみ
-- 値はスカラー値（string, int, bool, float）のみ。マップ・配列は不可
+### 6.1 ルール
+
+- トップレベルはフラットなキー・値の対応のみ（ネストした構造は不可）
+- 値はスカラー値のみ（文字列、整数、真偽値、浮動小数点数）。マップや配列は不可
 - null 値は不可
 - 空キーは不可
 - 重複キーは不可
 - 空文字列の値は許可
-- `sops` キーは除外後にバリデーション（`sops` の値がマップでも誤検出しない）
-- `sops` 除外後にキーが 0 件の場合はエラー
-- バリデーションエラー時は何が問題かを示すメッセージを表示し終了コード 1
+- 数値や真偽値は文字列に自動変換して SSM に登録
+- すべてのバリデーションは AWS への通信前に一括で実行される。問題がある場合はエラーメッセージとともに終了コード 1 で終了
 
-### 4.2 stdout 出力
+## 7. 出力
 
-**アクションプラン**（1 行/キー）:
+### 7.1 アクションプラン（stdout）
+
+変更内容を 1 行 1 キーで表示する。値は表示しない。変更のないキー（skip）は表示しない。
+
 ```
 create: /myapp/prod/DB_URL
 update: /myapp/prod/DB_PORT
 delete: /myapp/legacy/OLD_KEY
 ```
-- skip（変更なし）は表示しない
-- 値は絶対に表示しない
-- 通常実行と `--dry-run` で同一形式
 
-**サマリー行**:
+### 7.2 サマリー行（stdout）
+
 ```
 2 created, 1 updated, 1 deleted, 5 unchanged, 0 failed
 2 created, 1 updated, 1 deleted, 5 unchanged, 0 failed (dry-run)
 ```
 
-### 4.3 stderr 出力
-
-- すべての slog メッセージ（Error, Warn, Info, Debug）
-- 承認プロンプト（`Proceed? [y/N]`）
-- 個別キーのエラー（例: `error: /myapp/prod/API_KEY: AccessDeniedException: ...`）
-
-### 4.4 出力 YAML（export）
+### 7.3 export の出力形式
 
 ```yaml
 /myapp/database/host: "localhost"
 /myapp/database/port: "5432"
 ```
+
 - キーはアルファベット順
 - 値はダブルクォート形式
 
-## 5. Exit Codes
+### 7.4 ログ・エラー（stderr）
 
-| Code | Condition |
-|------|-----------|
-| 0 | 全件成功 |
-| 0 | 承認プロンプトで拒否 |
-| 1 | 承認プロンプト必要だが `/dev/tty` 利用不可 |
-| 1 | CLI 引数の不正 |
-| 1 | YAML バリデーションエラー |
-| 1 | 削除パターンの正規表現不正 |
-| 1 | コンフリクト検出（削除パターンと sync YAML の競合） |
-| 1 | 1 件以上の同期失敗 |
-| 1 | export 先ファイルが既存 |
-| 1 | export 対象パラメータが 0 件 |
-| 1 | AWS GetAll 自体の失敗（致命的エラー） |
+- ログ、承認プロンプト、エラーメッセージはすべて stderr に出力
+- `--debug` で詳細ログを有効化（デフォルトは Info レベル）
 
-## 6. Security Constraints
+## 8. 終了コード
 
-- パラメータの値はいかなる出力（stdout, stderr, ログ）にも絶対に含めない
-- キーパス（例: `/myapp/prod/API_KEY`）はログに記録可能（値ではないため）
-- export ファイルの権限は `0600`（オーナーのみ読み書き）
+| コード | 意味                                                               |
+| :----: | ------------------------------------------------------------------ |
+|   0    | 正常終了（全件成功、または承認キャンセルによる変更なし）           |
+|   1    | エラー（引数不正、バリデーション失敗、コンフリクト、同期失敗など） |
 
-## 7. AWS Integration Details
+## 9. AWS との接続
 
-- SSM PutParameter: `SecureString` 型、`Overwrite=true`、並行度 10 で個別実行
-- SSM DeleteParameters: 1 リクエストあたり最大 10 件のバッチ処理
-- SSM GetParametersByPath: `path=/`, `Recursive=true`, `WithDecryption=true`、ページネーション対応
-- タイムアウト: AWS SDK のデフォルトに委ねる（psm 側での設定なし）
-- リージョン: 環境変数 `AWS_REGION` / `AWS_DEFAULT_REGION` または SDK デフォルト
-- キー名バリデーション: psm 側では行わない（AWS API エラーに委ねる）
-- 値サイズ制限（SSM: 4KB standard / 8KB advanced）: psm 側では検証しない（AWS API エラーに委ねる）
+- 認証: `--profile` フラグで AWS プロファイルを指定。環境変数 `AWS_PROFILE` は安全のため常に無視される（意図しないプロファイル切り替えを防ぐ）
+- リージョン: `AWS_REGION` / `AWS_DEFAULT_REGION` 環境変数、または SDK デフォルト
+- パラメータ型: すべて `SecureString` として登録
+- 部分失敗の許容: 一部のキーが失敗しても残りの同期は続行する。失敗したキーは stderr に報告される（値は含めない）
