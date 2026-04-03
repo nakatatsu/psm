@@ -18,8 +18,8 @@
 
 **Purpose**: 実装に必要な前提条件の確認と準備
 
-- [ ] T001 既存 Terraform コードの現状確認（.tmp/mynote/infrastructure/github/ の全ファイル）
-- [ ] T002 `psm` リポジトリが `protected_repositories` 変数に含まれていることを確認（.tmp/mynote/infrastructure/github/variables.tf）
+- [x] T001 既存 Terraform コードの現状確認（.tmp/mynote/infrastructure/github/ の全ファイル）
+- [x] T002 `psm` リポジトリが `protected_repositories` 変数に含まれていることを確認（.tmp/mynote/infrastructure/github/variables.tf）
 
 ---
 
@@ -29,7 +29,7 @@
 
 **⚠️ CRITICAL**: この修正が完了しないと GitFlow の merge commit フローが動かない
 
-- [ ] T003 既存 `main` ブランチ Ruleset の `required_linear_history` を `false` に変更（.tmp/mynote/infrastructure/github/main.tf L23）
+- [x] T003 既存 `main` ブランチ Ruleset の `required_linear_history` を `false` に変更（.tmp/mynote/infrastructure/github/main.tf L23）
 
 **Checkpoint**: `terraform plan` で `main` Ruleset の `required_linear_history` 変更のみが差分として表示される
 
@@ -43,10 +43,10 @@
 
 ### Implementation
 
-- [ ] T004 [P] [US1] `develop` ブランチ Ruleset を追加（.tmp/mynote/infrastructure/github/main.tf）: PR必須（承認0名）、CI ステータスチェック必須（strict）、フォースプッシュ禁止、削除禁止、admin バイパス
-- [ ] T005 [P] [US1] `release-*` ブランチ Ruleset を追加（.tmp/mynote/infrastructure/github/main.tf）: PR必須（1名承認、stale review 却下、last push approval、コメント解決必須）、CI ステータスチェック必須（strict）、フォースプッシュ禁止、削除禁止、admin バイパス
-- [ ] T006 [P] [US1] `hotfix-*` ブランチ Ruleset を追加（.tmp/mynote/infrastructure/github/main.tf）: `release-*` と同一設定
-- [ ] T007 [US2] `terraform plan` で差分を確認し、既存の `main` Ruleset・タグ保護ルールに影響がないことを検証
+- [x] T004 [P] [US1] `develop` ブランチ Ruleset を追加（.tmp/mynote/infrastructure/github/main.tf）: PR必須（承認0名）、CI ステータスチェック必須（strict）、フォースプッシュ禁止、削除禁止、admin バイパス
+- [x] T005 [P] [US1] `release-*` ブランチ Ruleset を追加（.tmp/mynote/infrastructure/github/main.tf）: PR必須（1名承認、stale review 却下、last push approval、コメント解決必須）、CI ステータスチェック必須（strict）、フォースプッシュ禁止、削除禁止、admin バイパス
+- [x] T006 [P] [US1] `hotfix-*` ブランチ Ruleset を追加（.tmp/mynote/infrastructure/github/main.tf）: `release-*` と同一設定
+- [x] T007 [US2] `terraform plan` で差分を確認し、既存の `main` Ruleset・タグ保護ルールに影響がないことを検証
 
 **Checkpoint**: `terraform plan` で `develop`, `release-*`, `hotfix-*` の 3 Ruleset 追加 + `main` の `required_linear_history` 変更のみが差分
 
@@ -60,10 +60,10 @@
 
 ### Implementation
 
-- [ ] T008 [US3] `github_repository` リソースを新規作成（.tmp/mynote/infrastructure/github/repository.tf）: `allow_merge_commit = true`, `allow_squash_merge = false`, `allow_rebase_merge = false`, `delete_branch_on_merge = true`, `vulnerability_alerts = true`, `security_and_analysis` ブロック（`advanced_security = "enabled"`, `secret_scanning = "enabled"`, `secret_scanning_push_protection = "enabled"`）
-- [ ] T009 [US3] 既存 `psm` リポジトリを `terraform import github_repository.psm psm` で state に取り込む手順を文書化
-- [ ] T010 [US3] CodeQL ワークフローを作成（.github/workflows/codeql.yml）: Go 対象、push/PR/weekly スケジュールトリガー
-- [ ] T011 [US3] Terraform の `required_code_scanning` ブロックを Ruleset に追加を試みる（.tmp/mynote/infrastructure/github/main.tf）。Provider バグで失敗した場合は `required_status_checks` に CodeQL チェックを追加してフォールバック
+- [x] T008 [US3] `github_repository` リソースを新規作成（.tmp/mynote/infrastructure/github/repository.tf）: `allow_merge_commit = true`, `allow_squash_merge = false`, `allow_rebase_merge = false`, `delete_branch_on_merge = true`, `vulnerability_alerts = true`, `security_and_analysis` ブロック（`advanced_security = "enabled"`, `secret_scanning = "enabled"`, `secret_scanning_push_protection = "enabled"`）
+- [x] T009 [US3] 既存 `psm` リポジトリを `terraform import github_repository.psm psm` で state に取り込む手順を文書化
+- [x] T010 [US3] CodeQL ワークフローを作成（.github/workflows/codeql.yml）: Go 対象、push/PR/weekly スケジュールトリガー
+- [x] T011 [US3] Terraform の `required_code_scanning` ブロックを Ruleset に追加を試みる（.tmp/mynote/infrastructure/github/main.tf）。Provider バグで失敗した場合は `required_status_checks` に CodeQL チェックを追加してフォールバック
 
 **Checkpoint**: `terraform plan` でリポジトリ設定変更 + CodeQL 関連の差分が表示される
 
@@ -77,8 +77,8 @@
 
 ### Implementation
 
-- [ ] T012 [P] [US4] commit-msg hook スクリプトを作成（.githooks/commit-msg）: `#<数字>` パターン検証、マージコミット除外
-- [ ] T013 [P] [US4] ブランチ戦略 SKILL を作成（.claude/skills/branch-strategy/）: GitFlow フロー、ブランチ命名規則（`feature/<issue-no>-<short-description>`, `release-<version>`, `hotfix-<version>`）、Issue 番号付きコミットメッセージの指示
+- [x] T012 [P] [US4] commit-msg hook スクリプトを作成（.githooks/commit-msg）: `#<数字>` パターン検証、マージコミット除外
+- [x] T013 [P] [US4] ブランチ戦略 SKILL を作成（.claude/skills/branch-strategy/）: GitFlow フロー、ブランチ命名規則（`feature/<issue-no>-<short-description>`, `release-<version>`, `hotfix-<version>`）、Issue 番号付きコミットメッセージの指示
 
 **Checkpoint**: `git commit -m "test"` が拒否され、`git commit -m "test #45"` が成功する
 
@@ -88,9 +88,9 @@
 
 **Purpose**: ADR 記録とドキュメント更新
 
-- [ ] T014 [P] ADR を記録（.specify/decisions/）: ブランチ戦略（GitFlow 採用）、ブランチ命名規則の 2 件
-- [ ] T015 [P] CLAUDE.md にブランチ戦略の要約を追記（`core.hooksPath` 設定手順を含む）
-- [ ] T016 quickstart.md の手順に沿って全体動作を検証
+- [x] T014 [P] ADR を記録（.specify/decisions/）: ブランチ戦略（GitFlow 採用）、ブランチ命名規則の 2 件
+- [x] T015 [P] CLAUDE.md にブランチ戦略の要約を追記（`core.hooksPath` 設定手順を含む）
+- [x] T016 quickstart.md の手順に沿って全体動作を検証
 
 ---
 
