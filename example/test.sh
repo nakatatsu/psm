@@ -190,15 +190,15 @@ CALLER_IDENTITY=$(aws sts get-caller-identity ${PROFILE_FLAG} --output json)
 AWS_ACCOUNT_ID=$(echo "${CALLER_IDENTITY}" | grep -o '"Account": *"[^"]*"' | cut -d'"' -f4)
 AWS_ARN=$(echo "${CALLER_IDENTITY}" | grep -o '"Arn": *"[^"]*"' | cut -d'"' -f4)
 
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  ⚠  FOR TEST ONLY! DO NOT USE IN PRODUCTION!  ⚠           ║"
-echo "║                                                            ║"
-echo "║  This script WRITES and DELETES SSM parameters.            ║"
-echo "║  Running against the wrong account can cause data loss.    ║"
-echo "╠══════════════════════════════════════════════════════════════╣"
-printf "║  Account : %-48s ║\n" "${AWS_ACCOUNT_ID}"
-printf "║  ARN     : %-48s ║\n" "${AWS_ARN}"
-echo "╚══════════════════════════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════════"
+echo "║  ⚠  FOR TEST ONLY! DO NOT USE IN PRODUCTION!  ⚠"
+echo "║"
+echo "║  This script WRITES and DELETES SSM parameters. "
+echo "║  Running against the wrong account can cause data loss. "
+echo "╠══════════════════════════════════════════════════════════════"
+printf "║  Account : %-48s \n" "${AWS_ACCOUNT_ID}"
+printf "║  ARN     : %-48s \n" "${AWS_ARN}"
+echo "╚══════════════════════════════════════════════════════════════"
 echo ""
 
 if [[ ! -t 0 ]]; then
