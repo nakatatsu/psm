@@ -55,9 +55,9 @@ jobs:
       - name: Validate source branch
         run: |
           HEAD="${{ github.head_ref }}"
-          if [[ "$HEAD" =~ ^release/ || "$HEAD" =~ ^hotfix/ ]]; then
+          if [[ "$HEAD" =~ ^release- || "$HEAD" =~ ^hotfix- ]]; then
             echo "OK: $HEAD is allowed to merge into main"
           else
-            echo "REJECTED: $HEAD — main へは release/* か hotfix/* からのみマージ可能"
+            echo "REJECTED: $HEAD — main へは release-* か hotfix-* からのみマージ可能"
             exit 1
           fi
