@@ -3,8 +3,9 @@ name: gh-token
 description: >
   Retrieve GitHub tokens via the gh-token-sidecar container.
   Use this skill whenever a gh command fails with an auth error (401, 403, "auth required",
-  "token expired", "bad credentials", etc.). Also use proactively before any GitHub auth
-  operation (gh auth, git push/pull/fetch, GitHub API calls) when token expiry is suspected.
+  "token expired", "bad credentials", etc.). Also use proactively before any Git operation
+  (git push, git pull, git fetch, git clone) or GitHub API operation (gh CLI, GitHub API calls)
+  to ensure authentication is configured.
 ---
 
 # gh-token — Token Retrieval Skill
@@ -16,9 +17,11 @@ installation tokens. Always obtain tokens through this sidecar — never use a P
 
 ```bash
 export GH_TOKEN=$(curl -sf http://gh-token-sidecar/token | jq -r '.token')
+git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/nakatatsu/psm.git"
 ```
 
 After export, `gh` CLI and GitHub API calls in the same shell session will use this token automatically.
+The `git remote set-url` ensures that `git pull`, `git push`, and `git fetch` also authenticate correctly.
 
 ## If the Sidecar Is Unresponsive
 
@@ -39,8 +42,9 @@ If no response, the sidecar container is likely stopped. Tell the user:
 
 ## When to Use
 
-1. A `gh` command fails with an auth error (most common case)
-2. Before GitHub operations in a new shell session
-3. When a token may have expired (after a long gap)
+1. **Before any Git remote operation** (`git push`, `git pull`, `git fetch`, `git clone`) — always run this skill first to set up authentication
+2. A `gh` command fails with an auth error (401, 403, "auth required", "token expired", "bad credentials")
+3. Before GitHub API operations in a new shell session
+4. When a token may have expired (after a long gap)
 
 On auth error, retrieve a fresh token with this skill first, then retry the command.
