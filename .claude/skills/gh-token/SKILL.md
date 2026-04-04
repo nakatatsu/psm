@@ -3,8 +3,9 @@ name: gh-token
 description: >
   Retrieve GitHub tokens via the gh-token-sidecar container.
   Use this skill whenever a gh command fails with an auth error (401, 403, "auth required",
-  "token expired", "bad credentials", etc.). Also use proactively before any GitHub auth
-  operation (gh auth, git push/pull/fetch, GitHub API calls) when token expiry is suspected.
+  "token expired", "bad credentials", etc.). Also use proactively before any Git operation
+  (git push, git pull, git fetch, git clone) or GitHub API operation (gh CLI, GitHub API calls)
+  to ensure authentication is configured.
 ---
 
 # gh-token — Token Retrieval Skill
@@ -15,10 +16,12 @@ installation tokens. Always obtain tokens through this sidecar — never use a P
 ## How to Get a Token
 
 ```bash
-export GH_TOKEN=$(curl -sf http://gh-token-sidecar/token | jq -r '.token')
+TOKEN=$(curl -sf http://gh-token-sidecar/token | jq -r '.token')
+echo "$TOKEN" | gh auth login --with-token
+gh auth setup-git
 ```
 
-After export, `gh` CLI and GitHub API calls in the same shell session will use this token automatically.
+`gh auth login --with-token` registers the token with the gh CLI, then `gh auth setup-git` configures git to use the gh credential helper. This authenticates `gh` CLI, GitHub API calls, and `git push/pull/fetch`.
 
 ## If the Sidecar Is Unresponsive
 
@@ -34,13 +37,14 @@ If no response, the sidecar container is likely stopped. Tell the user:
 ## Important Notes
 
 - Tokens are freshly issued per request (no caching), so expiry is never a concern — just call the endpoint.
-- Setting `GH_TOKEN` is enough — `gh auth login` is not needed.
+- Authentication requires all three steps in order: (1) retrieve the token from the sidecar, (2) `gh auth login --with-token` to register it with the gh CLI, (3) `gh auth setup-git` to configure git's credential helper. Skipping step 2 causes `gh auth setup-git` and `git push` to fail with "not logged in" or "anonymous write access" errors.
 - The `.pem` private key exists only inside the sidecar container and is inaccessible from this container. Do not attempt to find or read it.
 
 ## When to Use
 
-1. A `gh` command fails with an auth error (most common case)
-2. Before GitHub operations in a new shell session
-3. When a token may have expired (after a long gap)
+1. **Before any Git remote operation** (`git push`, `git pull`, `git fetch`, `git clone`) — always run this skill first to set up authentication
+2. A `gh` command fails with an auth error (401, 403, "auth required", "token expired", "bad credentials")
+3. Before GitHub API operations in a new shell session
+4. When a token may have expired (after a long gap)
 
 On auth error, retrieve a fresh token with this skill first, then retry the command.
