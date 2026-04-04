@@ -17,11 +17,11 @@ installation tokens. Always obtain tokens through this sidecar — never use a P
 
 ```bash
 export GH_TOKEN=$(curl -sf http://gh-token-sidecar/token | jq -r '.token')
-git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/nakatatsu/psm.git"
+gh auth setup-git
 ```
 
 After export, `gh` CLI and GitHub API calls in the same shell session will use this token automatically.
-The `git remote set-url` ensures that `git pull`, `git push`, and `git fetch` also authenticate correctly.
+`gh auth setup-git` configures git to use the GitHub CLI credential helper, so `git pull`, `git push`, and `git fetch` also authenticate correctly — without persisting the token in `.git/config`.
 
 ## If the Sidecar Is Unresponsive
 
