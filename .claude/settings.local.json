@@ -5,6 +5,7 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:dev.to)"
-    ]
+    ],
+    "deny": ["git reset --hard"]
   }
 }
