@@ -37,5 +37,5 @@ go.work.sum
 # Built binary
 psm
 
-
 .worktrees/
+settings.local.json
