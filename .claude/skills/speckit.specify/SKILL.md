@@ -56,7 +56,11 @@ Given the user input:
 
    The JSON output contains BRANCH_NAME and SPEC_FILE paths -- always refer to it. Run this script only once per feature.
 
-5. Load `.specify/templates/spec-template.md` to understand required sections.
+5. Select and load the appropriate spec template:
+   - `.specify/templates/spec-template.md` — User Story format. Suited for user-facing feature development.
+   - `.specify/templates/spec-template-plain.md` — Requirements-based format. Suited for infrastructure, CI/CD, refactoring, and other features where User Stories are not a natural fit.
+   
+   Judge which template is appropriate based on the Issue content. The `create-new-feature.sh` script copies `spec-template.md` by default. If the plain template is more appropriate, overwrite SPEC_FILE with the contents of `spec-template-plain.md` before building the spec.
 
 6. **Build the specification** following this flow:
    1. Parse the Issue title and body retrieved in step 2. If both are empty: ERROR "Issue has no content".

@@ -30,42 +30,26 @@ go test -race ./...
 
 ### 対象
 
-AWS SSM Parameter Storeとの実通信を伴う操作。
-
-| テスト                     | 検証内容                                  |
-| -------------------------- | ----------------------------------------- |
-| `TestSSMStoreGetAll`       | パラメータ一括取得                        |
-| `TestSSMStorePutAndDelete` | パラメータ作成・削除のライフサイクル      |
-| `TestSSMDryRun`            | dry-run時にAWS側が変更されないこと        |
-| `TestSSMSyncExecute`       | sync実行後のAWS状態（create/update/skip） |
-| `TestExportRoundTrip`      | export→再parseで差分ゼロ（SC-006）        |
+コンポーネント間の契約をユースケースの1操作単位で検証する。検証対象のユースケースは[要件定義](../../specs/requirements.md)を参照すること。
 
 ### 実行方法
 
-```bash
-PSM_INTEGRATION_TEST=1 go test -race -v ./...
-```
+[example/](../../example/) ディレクトリをDevContainerで開き、`test.sh` を実行する。詳細は [example/README.md](../../example/README.md) を参照。
 
-`PSM_TEST_PROFILE` で任意のAWSプロファイルを指定可能。
+```bash
+# example/ ディレクトリのDevContainer内で実行
+PSM_BIN=./psm PSM_TEST_PROFILE=psm-sandbox bash test.sh
+```
 
 ### 実行条件
 
 - **リリース前**: 手動で実行する
-- CI���は `PSM_INTEGRATION_TEST` が未設定のため自動スキップされる
-
-### 方針
-
-- テスト用パラメータは `/psm-test/` プレフィックス配下に限定し、本番データと分離する
-- 各テストは `cleanAllSSMTestParams` で前処理し、`defer cleanupSSMTestData` で後処理する。テスト間の状態汚染を防止する
-- 強整合性が必要な検証には `GetParameter`（強整合性保証）を使用し、`GetParametersByPath`（結果整合性）に依存しない
 
 ### 前提条件
 
-- AWSクレデンシャルが設定済みであること
+- example/ ディレクトリをDevContainerで開いていること
+- AWSクレデンシャルが設定済みであること（`aws sso login`）
 - 対象アカウントのSSMに書き込み・削除権限があること
-- `/psm-test/` 配下を自由に使える��と
-
----
 
 ## 3. E2Eテスト
 
@@ -106,8 +90,6 @@ go build -o psm .
 - 実際のSOPS暗号化ファイルを使用し、復号→sync→検証の一連のフローを確認する
 - 本番環境ではなく、テスト用AWSアカウントまたは `/psm-test/` プレフィックスで実施する
 
----
-
 ## 4. 静的解析・セキュリティスキャン
 
 品質ゲート「マージ前」の自動チェックに該当する。
@@ -128,32 +110,47 @@ golangci-lint run ./...
 govulncheck ./...
 ```
 
----
+## 5. パフォーマンステスト
 
-## 5. 品質ゲートまとめ
+現時点では対象外とする。psmはCLIツールであり、処理対象のパラメータ数も限定的なため、応答時間が問題になる規模ではない。
 
-[テスト原則](../shared/standards/test-standard.md)の品質ゲート定義に対する、本プロジェクトでの実施内容。
+将来パラメータ数が大幅に増加した場合は、大量パラメータでのsync所要時間を計測するベンチマークテストの導入を検討する。
 
-### マージ前
+## 6. スモークテスト
 
-| 項目           | 実施内容                               | 自動/手動  |
-| -------------- | -------------------------------------- | ---------- |
-| 自動チェック   | gofumpt, golangci-lint, go build       | 自動（CI） |
-| ユニットテスト | `go test -race ./...`                  | 自動（CI） |
-| コードレビュー | PRレビュー（main向けは1 approval必須） | 手動       |
+### 対象
 
-### リリース前
+リリース候補のバイナリが主要機能を正常に実行できることの簡易確認。
 
-| 項目                 | 実���内容                                                           | 自動/手��� |
-| -------------------- | ------------------------------------------------------------------- | ---------- |
-| 結合テスト           | `PSM_INTEGRATION_TEST=1 go test -race -v ./...`                     | 手動       |
-| セキュリティスキャン | govulncheck, CodeQL                                                 | 自動（CI） |
-| パフォー��ンステスト | 現時点では対象外（CLIツールのため応答時間が問題になる規模ではない） | —          |
-| スモークテスト       | E2Eの主���シナリオ（sync dry-run, export）                          | 手動       |
+### 実行方法
 
-### リリース後
+```bash
+go build -o psm .
+./psm --version
+./psm sync --dry-run params.yaml
+./psm export /tmp/smoke-test-export.yaml && rm /tmp/smoke-test-export.yaml
+```
 
-| 項目           | 実施内容                                              | 自動/手動 |
-| -------------- | ----------------------------------------------------- | --------- |
-| ヘルスチェック | `psm --version`、dry-run実行                          | 手動      |
-| メトリクス検証 | 現時点では対象外（CLIツールのためメトリクス基盤なし） | —         |
+### 実行条件
+
+- **リリース前**: 必ず実施する
+
+### 判定基準
+
+- 各コマンドがエラーなく終了すること（exit code 0）
+
+## 7. ヘルスチェック
+
+CLIツールのため対象外。常駐プロセスではないためヘルスチェックの概念が該当しない。
+
+## 8. メトリクス検証
+
+CLIツールのため対象外。常駐プロセスではないためメトリクス基盤を持たない。
+
+## ブランチとテスト種別の対応
+
+| ブランチ   | ユニットテスト   | 静的解析         | 結合テスト       | E2Eテスト                              |
+| ---------- | ---------------- | ---------------- | ---------------- | -------------------------------------- |
+| feature/\* | CI自動（PR時）   | CI自動（PR時）   | —                | —                                      |
+| develop    | CI自動（push時） | CI自動（push時） | CI自動（push時） | —                                      |
+| release-\* | CI自動（push時） | CI自動（push時） | CI自動（push時） | リリースブランチのビルドバイナリで実施 |

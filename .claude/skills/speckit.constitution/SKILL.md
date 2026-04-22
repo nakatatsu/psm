@@ -40,7 +40,7 @@ Follow this execution flow:
 
 4. Propagate consistency to dependent files:
    - Read `.specify/templates/plan-template.md` and verify any "Constitution Check" or rules align with updated principles.
-   - Read `.specify/templates/spec-template.md` for scope/requirements alignment. Update if the constitution adds or removes mandatory sections or constraints.
+   - Read `.specify/templates/spec-template.md` and `.specify/templates/spec-template-plain.md` for scope/requirements alignment. Update if the constitution adds or removes mandatory sections or constraints.
    - Read `.specify/templates/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
    - Read each command file in `.specify/templates/commands/*.md` to verify no outdated references remain.
    - Read any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`). Update references to changed principles.
