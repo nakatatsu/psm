@@ -34,22 +34,26 @@ go test -race ./...
 
 ### 実行方法
 
-[example/](../../example/) ディレクトリをDevContainerで開き、`test.sh` を実行する。詳細は [example/README.md](../../example/README.md) を参照。
+CI（GitHub Actions）により自動実行される。developブランチおよびリリースブランチへのpush時に `.github/workflows/integration-test.yml` がトリガーされる。
+
+ローカルで手動実行する場合:
 
 ```bash
-# example/ ディレクトリのDevContainer内で実行
-PSM_BIN=./psm PSM_TEST_PROFILE=psm-sandbox bash test.sh
+go build -o psm .
+PSM_BIN=./psm PSM_TEST_PROFILE=psm-sandbox bash tests/integration/test.sh
 ```
 
 ### 実行条件
 
-- **リリース前**: 手動で実行する
+- **CI自動**: developブランチおよびリリースブランチへのpush時
+- **手動**: 必要に応じてローカルで実行可能
 
 ### 前提条件
 
-- example/ ディレクトリをDevContainerで開いていること
-- AWSクレデンシャルが設定済みであること（`aws sso login`）
-- 対象アカウントのSSMに書き込み・削除権限があること
+- CI: AWSアカウントにOIDCプロバイダとIAMロールが設定されていること
+- CI: GitHubリポジトリにAWS_ROLE_ARNシークレットとAWS_REGION変数が設定されていること
+- ローカル: AWSクレデンシャルが設定済みであること（`aws sso login`）
+- ローカル: 対象アカウントのSSMに書き込み・削除権限があること
 
 ## 3. E2Eテスト
 

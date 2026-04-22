@@ -31,6 +31,15 @@
 - 結合テストが並行実行された場合、テスト用パラメータ（/myapp/配下）が競合するかもしれないが、したら失敗でよい
 - example/のDevContainerのDockerfileに記載されているpsmバージョン（PSM_VERSION）と、テスト対象バイナリのバージョンが異なる場合は問題なので、当然ビルドしたばかりのバイナリを使わねばならない
 
+## Clarifications
+
+### Session 2026-04-21
+
+- Q: テストディレクトリの配置場所と名前は？ -> A: `tests/integration/` をリポジトリルートに作成する
+- Q: E2Eバイナリの命名規則（FR-006「名前がかぶらないように」）は？ -> A: `psm_<version>_<os>_<arch>` 形式とし、GitHub Actions artifactとして保存する
+- Q: リリースブランチのOIDC信頼ポリシーでのブランチ指定方法は？ -> A: IAM信頼ポリシーで `StringLike` 条件を使い `repo:nakatatsu/psm:ref:refs/heads/release-*` を許可する
+- Q: 結合テストで使うpsmバイナリはどうビルドするか？ -> A: CIワークフロー内で `go build` してそのまま使用する
+
 ## Assumptions
 
 - テスト用AWSアカウントでOIDCの設定が行われていること
