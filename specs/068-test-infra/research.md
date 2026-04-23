@@ -62,7 +62,7 @@ on:
 **Rationale**: example/は触らない制約（FR-001）。test.shはSCRIPT_DIR相対でファイル参照しているため、テストデータも合わせてコピーすれば動作する。
 **Alternatives considered**:
 - シンボリックリンク → CIのcheckoutで壊れる可能性
-- test.shからexample/を参照 → FR-002「example/に依存しない」に違反（注: FR-002の文言は変更されたが、テスト資材の独立性は維持すべき）
+- test.shからexample/を参照 → FR-001 で example/ は触らない制約のため不可。テスト資材はtests/integration/配下で独立させる
 
 ### 必要なファイル
 

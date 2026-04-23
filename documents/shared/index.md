@@ -20,7 +20,7 @@
 
 ## CI/CD
 
-- [CI/CD](policies/cicid.md)
+- [CI/CD](policies/cicd.md)
 
 ## 監視・ログ
 

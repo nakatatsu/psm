@@ -22,7 +22,7 @@
 ## Success Criteria _(mandatory)_
 
 - **SC-001**: developブランチへのpush時に結合テストがCI上で自動実行され、結果が確認できる
-- **SC-002**: 結合テストの全14シナリオがCI上でPASS/FAIL/SKIPのいずれかの結果を返す
+- **SC-002**: 結合テストの全シナリオがCI上でPASS/FAIL/SKIPのいずれかの結果を返す
 - **SC-004**: E2Eテスト用バイナリをリリースブランチから準備する手順がCIにより自動化されている
 
 ## Edge Cases

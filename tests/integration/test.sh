@@ -9,18 +9,29 @@
 #
 # Runs all behavioral scenarios against a real AWS sandbox and reports results.
 #
-# Prerequisites (complete these before running):
+# Prerequisites (local manual run):
 #   1. Open this directory in the DevContainer
 #   2. Log in to AWS SSO:
 #        aws configure sso --use-device-code
 #        aws sso login --sso-session psm-sandbox --use-device-code
 #
-# Environment variables (required):
-#   PSM_BIN           Path to psm binary
-#   PSM_TEST_PROFILE  AWS profile name
+# Environment variables:
+#   PSM_BIN                  (required) Path to psm binary
+#   PSM_TEST_PROFILE         (optional) AWS profile name.
+#                            Omit in CI where OIDC provides credentials.
+#   CI                       (optional) When "true", skip interactive safety
+#                            prompt. PSM_EXPECTED_ACCOUNT_ID is then required.
+#   PSM_EXPECTED_ACCOUNT_ID  (required when CI=true) Expected AWS account ID;
+#                            the script aborts if the caller identity does not
+#                            match, as a defense-in-depth guard against the
+#                            OIDC role ever being pointed at a wrong account.
 #
 # Usage:
+#   # Local (interactive)
 #   PSM_BIN=./psm PSM_TEST_PROFILE=psm-sandbox bash test.sh
+#
+#   # CI
+#   CI=true PSM_BIN=./psm PSM_EXPECTED_ACCOUNT_ID=123456789012 bash test.sh
 # =============================================================================
 set -uo pipefail
 
@@ -35,15 +46,16 @@ if [[ -z "${PSM_BIN:-}" ]]; then
 fi
 PSM="${PSM_BIN}"
 if [[ -n "${PSM_TEST_PROFILE:-}" ]]; then
-  PROFILE_FLAG="--profile ${PSM_TEST_PROFILE}"
+  PROFILE_FLAG=(--profile "${PSM_TEST_PROFILE}")
 else
-  PROFILE_FLAG=""
+  PROFILE_FLAG=()
 fi
 
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0
-SCENARIO_TOTAL=14
+# Auto-count scenarios so the label stays in sync when scenarios are added/removed.
+SCENARIO_TOTAL=$(grep -cE '^echo "=== Scenario [0-9]+/' "${BASH_SOURCE[0]}")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -68,7 +80,7 @@ get_param() {
   aws ssm get-parameter \
     --name "$1" \
     --with-decryption \
-    ${PROFILE_FLAG} \
+    "${PROFILE_FLAG[@]}" \
     --query 'Parameter.Value' \
     --output text 2>/dev/null
 }
@@ -80,7 +92,7 @@ put_param() {
     --value "$2" \
     --type SecureString \
     --overwrite \
-    ${PROFILE_FLAG} \
+    "${PROFILE_FLAG[@]}" \
     --output text
 }
 
@@ -89,7 +101,7 @@ param_exists() {
   aws ssm get-parameter \
     --name "$1" \
     --with-decryption \
-    ${PROFILE_FLAG} \
+    "${PROFILE_FLAG[@]}" \
     --output text >/dev/null 2>&1
 }
 
@@ -97,22 +109,29 @@ param_exists() {
 get_all_param_names() {
   aws ssm get-parameters-by-path \
     --path "/myapp/" --recursive --with-decryption \
-    ${PROFILE_FLAG} \
+    "${PROFILE_FLAG[@]}" \
     --query 'Parameters[].Name' \
     --output text 2>/dev/null | tr '\t' '\n' | grep -v '^$' | sort
 }
 
 # Delete all parameters under /myapp/
+# SSM DeleteParameters accepts at most 10 names per call; split into batches
+# with xargs -n 10 so that accumulated test state does not break cleanup.
 cleanup_all() {
   local names
   names=$(get_all_param_names)
   if [[ -n "${names}" ]]; then
-    # shellcheck disable=SC2086
-    aws ssm delete-parameters \
-      --names ${names} \
-      ${PROFILE_FLAG} \
-      --output text 2>/dev/null || true
+    echo "${names}" | xargs -n 10 aws ssm delete-parameters \
+      "${PROFILE_FLAG[@]}" \
+      --output text --names 2>/dev/null || true
   fi
+}
+
+# Run `script -qec <cmd> /dev/null` with a pre-supplied answer on stdin so
+# <cmd> sees a pseudo-TTY for approval prompts that read /dev/tty.
+run_with_tty_answer() {
+  local answer="$1"; shift
+  printf '%s\n' "${answer}" | script -qec "$*" /dev/null
 }
 
 # Assert SSM state matches expected key=value pairs exactly under /myapp/.
@@ -174,7 +193,7 @@ EXPECTED_FULL_STATE=(
 echo "=== Prerequisites ==="
 
 printf "aws credentials ... "
-if aws sts get-caller-identity ${PROFILE_FLAG} --output text >/dev/null 2>&1; then
+if aws sts get-caller-identity "${PROFILE_FLAG[@]}" --output text >/dev/null 2>&1; then
   echo "ok"
 else
   echo "FAIL"
@@ -186,9 +205,9 @@ echo ""
 # ---------------------------------------------------------------------------
 # Safety gate: confirm the target AWS account before proceeding
 # ---------------------------------------------------------------------------
-CALLER_IDENTITY=$(aws sts get-caller-identity ${PROFILE_FLAG} --output json)
-AWS_ACCOUNT_ID=$(echo "${CALLER_IDENTITY}" | grep -o '"Account": *"[^"]*"' | cut -d'"' -f4)
-AWS_ARN=$(echo "${CALLER_IDENTITY}" | grep -o '"Arn": *"[^"]*"' | cut -d'"' -f4)
+CALLER_IDENTITY=$(aws sts get-caller-identity "${PROFILE_FLAG[@]}" --output json)
+AWS_ACCOUNT_ID=$(echo "${CALLER_IDENTITY}" | jq -r '.Account')
+AWS_ARN=$(echo "${CALLER_IDENTITY}" | jq -r '.Arn')
 
 echo "╔══════════════════════════════════════════════════════════════"
 echo "║  ⚠  FOR TEST ONLY! DO NOT USE IN PRODUCTION!  ⚠"
@@ -202,7 +221,17 @@ echo "╚═══════════════════════�
 echo ""
 
 if [[ "${CI:-}" == "true" ]]; then
-  echo "CI mode: skipping interactive confirmation"
+  # Defense-in-depth: require an allowlisted account ID even though the OIDC
+  # trust policy should already restrict which role can be assumed.
+  if [[ -z "${PSM_EXPECTED_ACCOUNT_ID:-}" ]]; then
+    echo "Error: PSM_EXPECTED_ACCOUNT_ID must be set in CI mode."
+    exit 1
+  fi
+  if [[ "${AWS_ACCOUNT_ID}" != "${PSM_EXPECTED_ACCOUNT_ID}" ]]; then
+    echo "Error: AWS account mismatch. expected=${PSM_EXPECTED_ACCOUNT_ID} actual=${AWS_ACCOUNT_ID}"
+    exit 1
+  fi
+  echo "CI mode: account verified, skipping interactive confirmation"
 else
   if [[ ! -t 0 ]]; then
     echo "Error: this script must be run from an interactive terminal."
@@ -223,12 +252,31 @@ echo ""
 # ---------------------------------------------------------------------------
 echo "=== Setup ==="
 
-TMPDIR_TEST=$(mktemp -d)
+if ! TMPDIR_TEST=$(mktemp -d); then
+  echo "Error: mktemp failed"
+  exit 1
+fi
 trap 'rm -rf "${TMPDIR_TEST}"' EXIT
+
+# Location for capturing psm stderr in error-path scenarios. Having the log
+# available lets assertion failures surface the real error instead of a
+# silent "expected non-zero exit code".
+PSM_STDERR="${TMPDIR_TEST}/psm-stderr.log"
 
 # Generate ephemeral age key and encrypt secrets.example.yaml
 AGE_KEY_FILE="${TMPDIR_TEST}/age-key.txt"
-AGE_PUBLIC_KEY=$(age-keygen -o "${AGE_KEY_FILE}" 2>&1 | grep "Public key:" | awk '{print $3}')
+AGE_KEYGEN_LOG="${TMPDIR_TEST}/age-keygen.log"
+if ! age-keygen -o "${AGE_KEY_FILE}" >"${AGE_KEYGEN_LOG}" 2>&1; then
+  echo "Error: age-keygen failed"
+  cat "${AGE_KEYGEN_LOG}"
+  exit 1
+fi
+AGE_PUBLIC_KEY=$(grep "Public key:" "${AGE_KEYGEN_LOG}" | awk '{print $3}')
+if [[ -z "${AGE_PUBLIC_KEY}" ]]; then
+  echo "Error: could not extract age public key"
+  cat "${AGE_KEYGEN_LOG}"
+  exit 1
+fi
 export SOPS_AGE_KEY_FILE="${AGE_KEY_FILE}"
 
 cat > "${TMPDIR_TEST}/.sops.yaml" <<SOPSEOF
@@ -236,7 +284,10 @@ creation_rules:
   - age: "${AGE_PUBLIC_KEY}"
 SOPSEOF
 
-(cd "${TMPDIR_TEST}" && sops -e "${TEST_YAML}" > secrets.enc.yaml)
+if ! (cd "${TMPDIR_TEST}" && sops -e "${TEST_YAML}" > secrets.enc.yaml); then
+  echo "Error: sops encryption failed"
+  exit 1
+fi
 
 # Delete pattern file (matches /myapp/legacy/)
 cat > "${TMPDIR_TEST}/delete-patterns.yaml" <<DELEOF
@@ -253,12 +304,12 @@ echo "cleaning up previous test data ..."
 cleanup_all
 
 # ---------------------------------------------------------------------------
-# Scenario 1/14: Dry-run
+# Scenario 1: Dry-run
 # ---------------------------------------------------------------------------
 echo "=== Scenario 1/${SCENARIO_TOTAL}: Dry-run ==="
 
 stdout=$( (cd "${TMPDIR_TEST}" && sops -d secrets.enc.yaml) | \
-  ${PSM} sync ${PROFILE_FLAG} --dry-run /dev/stdin )
+  ${PSM} sync "${PROFILE_FLAG[@]}" --dry-run /dev/stdin )
 echo "${stdout}"
 
 if ! echo "${stdout}" | grep -q "(dry-run)"; then
@@ -271,13 +322,13 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 2/14: Sync with --skip-approve
+# Scenario 2: Sync with --skip-approve
 # ---------------------------------------------------------------------------
 echo "=== Scenario 2/${SCENARIO_TOTAL}: Sync with --skip-approve ==="
 
 exit_code=0
 (cd "${TMPDIR_TEST}" && sops -d secrets.enc.yaml) | \
-  ${PSM} sync ${PROFILE_FLAG} --skip-approve /dev/stdin || exit_code=$?
+  ${PSM} sync "${PROFILE_FLAG[@]}" --skip-approve /dev/stdin || exit_code=$?
 
 if [[ ${exit_code} -ne 0 ]]; then
   fail "exit code ${exit_code}, expected 0"
@@ -289,7 +340,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 3/14: Delete with --delete
+# Scenario 3: Delete with --delete
 # ---------------------------------------------------------------------------
 echo "=== Scenario 3/${SCENARIO_TOTAL}: Delete with --delete ==="
 
@@ -297,7 +348,7 @@ echo "=== Scenario 3/${SCENARIO_TOTAL}: Delete with --delete ==="
 put_param "/myapp/legacy/old-key" "to-be-deleted"
 
 exit_code=0
-${PSM} sync ${PROFILE_FLAG} --skip-approve \
+${PSM} sync "${PROFILE_FLAG[@]}" --skip-approve \
   --delete "${TMPDIR_TEST}/delete-patterns.yaml" \
   "${TEST_YAML}" || exit_code=$?
 
@@ -311,13 +362,13 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 4/14: Conflict detection
+# Scenario 4: Conflict detection
 # ---------------------------------------------------------------------------
 echo "=== Scenario 4/${SCENARIO_TOTAL}: Conflict detection ==="
 
 # Capture state before conflict attempt
 exit_code=0
-${PSM} sync ${PROFILE_FLAG} --skip-approve \
+${PSM} sync "${PROFILE_FLAG[@]}" --skip-approve \
   --delete "${TMPDIR_TEST}/conflict-patterns.yaml" \
   "${TEST_YAML}" 2>&1 || exit_code=$?
 
@@ -331,17 +382,17 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 5/14: Debug logging
+# Scenario 5: Debug logging
 # ---------------------------------------------------------------------------
 echo "=== Scenario 5/${SCENARIO_TOTAL}: Debug logging ==="
 
 # 5a: --debug produces level=DEBUG
-output_debug=$(${PSM} sync ${PROFILE_FLAG} --debug --dry-run \
+output_debug=$(${PSM} sync "${PROFILE_FLAG[@]}" --debug --dry-run \
   "${TEST_YAML}" 2>&1)
 echo "${output_debug}"
 
 # 5b: without --debug, level=DEBUG must NOT appear
-output_normal=$(${PSM} sync ${PROFILE_FLAG} --dry-run \
+output_normal=$(${PSM} sync "${PROFILE_FLAG[@]}" --dry-run \
   "${TEST_YAML}" 2>&1)
 
 if ! echo "${output_debug}" | grep -q "level=DEBUG"; then
@@ -354,7 +405,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 6/14: Piped input + /dev/tty approve
+# Scenario 6: Piped input + /dev/tty approve
 # ---------------------------------------------------------------------------
 echo "=== Scenario 6/${SCENARIO_TOTAL}: Piped input + /dev/tty approve ==="
 
@@ -366,8 +417,8 @@ else
 
   # Pipe YAML via stdin; approval prompt reads from /dev/tty (via script pseudo-TTY)
   exit_code=0
-  printf 'y\n' | script -qec \
-    "cat ${TEST_YAML} | ${PSM} sync ${PROFILE_FLAG} /dev/stdin" /dev/null \
+  run_with_tty_answer 'y' \
+    "cat ${TEST_YAML} | ${PSM} sync ${PROFILE_FLAG[*]} /dev/stdin" \
     || exit_code=$?
 
   if ! assert_state "piped+tty yes: sync applied" "${EXPECTED_FULL_STATE[@]}"; then
@@ -379,7 +430,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 7/14: No changes
+# Scenario 7: No changes
 # ---------------------------------------------------------------------------
 echo "=== Scenario 7/${SCENARIO_TOTAL}: No changes ==="
 
@@ -389,7 +440,7 @@ put_param "/myapp/database/port" "5432"
 put_param "/myapp/database/password" "do-not-look-at-me"
 put_param "/myapp/api/key" "come-on-do-not-look-at-me"
 
-stdout=$(${PSM} sync ${PROFILE_FLAG} --skip-approve \
+stdout=$(${PSM} sync "${PROFILE_FLAG[@]}" --skip-approve \
   "${TEST_YAML}")
 
 if ! echo "${stdout}" | grep -q "0 created, 0 updated, 0 deleted"; then
@@ -402,25 +453,25 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 8/14: Missing file
+# Scenario 8: Missing file
 # ---------------------------------------------------------------------------
 echo "=== Scenario 8/${SCENARIO_TOTAL}: Missing file ==="
 
 exit_code=0
-${PSM} sync ${PROFILE_FLAG} --skip-approve \
-  "/nonexistent/path/secrets.yaml" 2>/dev/null || exit_code=$?
+${PSM} sync "${PROFILE_FLAG[@]}" --skip-approve \
+  "/nonexistent/path/secrets.yaml" 2>"${PSM_STDERR}" || exit_code=$?
 
 if [[ ${exit_code} -eq 0 ]]; then
-  fail "expected non-zero exit code for missing file"
+  fail "expected non-zero exit code for missing file (stderr: $(cat "${PSM_STDERR}"))"
 elif ! assert_state "missing file: state unchanged" "${EXPECTED_FULL_STATE[@]}"; then
-  fail "missing file error changed SSM state"
+  fail "missing file error changed SSM state (stderr: $(cat "${PSM_STDERR}"))"
 else
   pass
 fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 9/14: Invalid YAML
+# Scenario 9: Invalid YAML
 # ---------------------------------------------------------------------------
 echo "=== Scenario 9/${SCENARIO_TOTAL}: Invalid YAML ==="
 
@@ -430,38 +481,38 @@ invalid: [broken
 INVALEOF
 
 exit_code=0
-${PSM} sync ${PROFILE_FLAG} --skip-approve \
-  "${TMPDIR_TEST}/invalid.yaml" 2>/dev/null || exit_code=$?
+${PSM} sync "${PROFILE_FLAG[@]}" --skip-approve \
+  "${TMPDIR_TEST}/invalid.yaml" 2>"${PSM_STDERR}" || exit_code=$?
 
 if [[ ${exit_code} -eq 0 ]]; then
-  fail "expected non-zero exit code for invalid YAML"
+  fail "expected non-zero exit code for invalid YAML (stderr: $(cat "${PSM_STDERR}"))"
 elif ! assert_state "invalid YAML: state unchanged" "${EXPECTED_FULL_STATE[@]}"; then
-  fail "invalid YAML error changed SSM state"
+  fail "invalid YAML error changed SSM state (stderr: $(cat "${PSM_STDERR}"))"
 else
   pass
 fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 10/14: Empty input
+# Scenario 10: Empty input
 # ---------------------------------------------------------------------------
 echo "=== Scenario 10/${SCENARIO_TOTAL}: Empty input ==="
 
 exit_code=0
-${PSM} sync ${PROFILE_FLAG} --skip-approve \
-  /dev/null 2>/dev/null || exit_code=$?
+${PSM} sync "${PROFILE_FLAG[@]}" --skip-approve \
+  /dev/null 2>"${PSM_STDERR}" || exit_code=$?
 
 if [[ ${exit_code} -eq 0 ]]; then
-  fail "expected non-zero exit code for empty input"
+  fail "expected non-zero exit code for empty input (stderr: $(cat "${PSM_STDERR}"))"
 elif ! assert_state "empty input: state unchanged" "${EXPECTED_FULL_STATE[@]}"; then
-  fail "empty input error changed SSM state"
+  fail "empty input error changed SSM state (stderr: $(cat "${PSM_STDERR}"))"
 else
   pass
 fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 11/14: TTY approve yes
+# Scenario 11: TTY approve yes
 # ---------------------------------------------------------------------------
 echo "=== Scenario 11/${SCENARIO_TOTAL}: TTY approve yes ==="
 
@@ -473,7 +524,8 @@ else
 
   # script creates a pseudo-TTY; pipe "y" to approve
   exit_code=0
-  printf 'y\n' | script -qec "${PSM} sync ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
+  run_with_tty_answer 'y' \
+    "${PSM} sync ${PROFILE_FLAG[*]} ${TEST_YAML}" \
     || exit_code=$?
 
   if ! assert_state "TTY yes: sync applied" "${EXPECTED_FULL_STATE[@]}"; then
@@ -485,7 +537,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 12/14: TTY approve no
+# Scenario 12: TTY approve no
 # ---------------------------------------------------------------------------
 echo "=== Scenario 12/${SCENARIO_TOTAL}: TTY approve no ==="
 
@@ -497,7 +549,8 @@ else
 
   # script creates a pseudo-TTY; pipe "n" to decline
   exit_code=0
-  printf 'n\n' | script -qec "${PSM} sync ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
+  run_with_tty_answer 'n' \
+    "${PSM} sync ${PROFILE_FLAG[*]} ${TEST_YAML}" \
     || exit_code=$?
 
   val=$(get_param "/myapp/database/host" || echo "")
@@ -505,7 +558,8 @@ else
     fail "approve no should not change state, but /myapp/database/host='${val}'"
   else
     # Also test empty input (just Enter) -> should decline (default N)
-    printf '\n' | script -qec "${PSM} sync ${PROFILE_FLAG} ${TEST_YAML}" /dev/null \
+    run_with_tty_answer '' \
+      "${PSM} sync ${PROFILE_FLAG[*]} ${TEST_YAML}" \
       || true
 
     val2=$(get_param "/myapp/database/host" || echo "")
@@ -522,7 +576,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 13/14: Piped input + /dev/tty decline
+# Scenario 13: Piped input + /dev/tty decline
 # ---------------------------------------------------------------------------
 echo "=== Scenario 13/${SCENARIO_TOTAL}: Piped input + /dev/tty decline ==="
 
@@ -534,8 +588,8 @@ else
 
   # Pipe YAML via stdin; decline approval via /dev/tty (pseudo-TTY from script)
   exit_code=0
-  printf 'N\n' | script -qec \
-    "cat ${TEST_YAML} | ${PSM} sync ${PROFILE_FLAG} /dev/stdin" /dev/null \
+  run_with_tty_answer 'N' \
+    "cat ${TEST_YAML} | ${PSM} sync ${PROFILE_FLAG[*]} /dev/stdin" \
     || exit_code=$?
 
   val=$(get_param "/myapp/database/host" || echo "")
@@ -551,7 +605,7 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# Scenario 14/14: Piped input + no TTY → error
+# Scenario 14: Piped input + no TTY → error
 # ---------------------------------------------------------------------------
 echo "=== Scenario 14/${SCENARIO_TOTAL}: Piped input + no TTY → error ==="
 
@@ -561,12 +615,12 @@ else
   # setsid detaches from controlling terminal, so /dev/tty is unavailable
   exit_code=0
   cat "${TEST_YAML}" | \
-    setsid --wait ${PSM} sync ${PROFILE_FLAG} /dev/stdin 2>/dev/null || exit_code=$?
+    setsid --wait ${PSM} sync "${PROFILE_FLAG[@]}" /dev/stdin 2>"${PSM_STDERR}" || exit_code=$?
 
   if [[ ${exit_code} -ne 1 ]]; then
-    fail "expected exit code 1 (no tty), got ${exit_code}"
+    fail "expected exit code 1 (no tty), got ${exit_code} (stderr: $(cat "${PSM_STDERR}"))"
   elif ! assert_state "no-tty: state unchanged" "${EXPECTED_FULL_STATE[@]}"; then
-    fail "no-tty error changed SSM state"
+    fail "no-tty error changed SSM state (stderr: $(cat "${PSM_STDERR}"))"
   else
     pass
   fi

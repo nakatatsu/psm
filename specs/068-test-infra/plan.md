@@ -17,7 +17,7 @@
 **Project Type**: CLI tool (CI/CD infrastructure)
 **Performance Goals**: N/A
 **Constraints**: OIDC認証のみ（IAMアクセスキー禁止）。ブランチ制限でdevelop + release-*のみ許可
-**Scale/Scope**: 14シナリオの結合テスト、1バイナリビルド
+**Scale/Scope**: 結合テスト(シナリオ数は`tests/integration/test.sh`が単一ソース、`SCENARIO_TOTAL`で自動集計)、1バイナリビルド
 
 ## Constitution Check
 

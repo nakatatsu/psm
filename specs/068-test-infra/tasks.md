@@ -39,9 +39,9 @@
     5. `aws-actions/configure-aws-credentials` with OIDC (role-to-assume from secrets)
     6. Run `bash tests/integration/test.sh` with `PSM_BIN` and `PSM_TEST_PROFILE` env vars
 - [ ] T007 Add GitHub repository secrets/variables (manual setup required):
-  - `AWS_ROLE_ARN` — OIDC用IAMロールのARN
-  - `AWS_REGION` — テスト用リージョン
-  - `PSM_TEST_PROFILE` — AWSプロファイル名（OIDCでは不要の可能性あり、test.shのPROFILE_FLAG処理を確認）
+  - Secret `AWS_ROLE_ARN` — OIDC用IAMロールのARN
+  - Variable `AWS_REGION` — テスト用リージョン
+  - Variable `AWS_ACCOUNT_ID` — 期待するAWSアカウントID（test.sh の PSM_EXPECTED_ACCOUNT_ID に供給、defense-in-depth チェックに使用）
 
 **Checkpoint**: developブランチへのpushで結合テストが自動実行される
 
@@ -72,7 +72,7 @@
 - [x] T011 Modify `tests/integration/test.sh` — CI=true時にsafety gateスキップ、PROFILE_FLAGをオプション化
 - [ ] T012 Test the workflow end-to-end (manual verification after merge)
 
-**Checkpoint**: test.shがCI環境で14シナリオ実行可能
+**Checkpoint**: test.shがCI環境で全シナリオ実行可能
 
 ---
 

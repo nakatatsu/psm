@@ -13,7 +13,9 @@ permissions:
 env:
   GO_VERSION: "1.26.1"
   SOPS_VERSION: "3.12.1"
+  SOPS_SHA256: "cf3136d20a6004405c986a48e179c3c7a731f777fbf105a37bd5dac5c9047100"
   AGE_VERSION: "1.2.1"
+  AGE_SHA256: "7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50"
 
 jobs:
   integration-test:
@@ -30,14 +32,17 @@ jobs:
 
       - name: Install SOPS
         run: |
-          curl -fsSL -o /usr/local/bin/sops \
+          curl -fsSL -o /tmp/sops \
             "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
-          chmod +x /usr/local/bin/sops
+          echo "${SOPS_SHA256}  /tmp/sops" | sha256sum -c -
+          install -m 0755 /tmp/sops /usr/local/bin/sops
+          rm -f /tmp/sops
 
       - name: Install age
         run: |
           curl -fsSL -o /tmp/age.tar.gz \
             "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz"
+          echo "${AGE_SHA256}  /tmp/age.tar.gz" | sha256sum -c -
           tar xzf /tmp/age.tar.gz -C /usr/local/bin --strip-components=1 age/age age/age-keygen
           chmod +x /usr/local/bin/age /usr/local/bin/age-keygen
           rm /tmp/age.tar.gz
@@ -52,6 +57,7 @@ jobs:
         env:
           CI: "true"
           PSM_BIN: ./psm
+          PSM_EXPECTED_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
         run: bash tests/integration/test.sh
 
   build-e2e-binary:
@@ -67,7 +73,16 @@ jobs:
       - name: Build E2E binary
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          go build -ldflags "-X main.version=${SHORT_SHA}" -o "psm_${SHORT_SHA}_linux_amd64" .
+          go build -trimpath -ldflags "-X main.version=${SHORT_SHA}" -o "psm_${SHORT_SHA}_linux_amd64" .
+          echo "BINARY_NAME=psm_${SHORT_SHA}_linux_amd64" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
+
+      - name: Smoke-check binary (ldflags version injection)
+        run: |
+          output=$(./"${BINARY_NAME}" --version 2>&1)
+          echo "${output}"
+          echo "${output}" | grep -q "${SHORT_SHA}" \
+            || { echo "Error: binary --version does not contain git sha ${SHORT_SHA}"; exit 1; }
 
       - name: Upload E2E binary
         uses: actions/upload-artifact@v4
