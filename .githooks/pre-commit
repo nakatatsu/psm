@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+#
+# pre-commit hook: Run mechanical Go checks when staged changes touch Go code or
+# Go-related build inputs. Aborts the commit on any failure.
+#
+# Why: bumping a runtime / dependency / Go version without local verification, then
+# pushing and waiting for CI, has actually slipped into this repo before. CI is a
+# redundant safety net, not the first line of defense. This hook makes the gate
+# physical instead of conventional.
+#
+# Setup (already configured for this repo): git config core.hooksPath .githooks
+#
+# Bypass policy: do NOT use --no-verify. If the hook is wrong, fix the hook.
+
+set -eo pipefail
+
+# Files whose staging triggers the full check sequence.
+# Order: file paths only (not commit content). git diff --cached lists staged paths.
+TRIGGER_REGEX='\.go$|^go\.mod$|^go\.sum$'
+
+# Collect staged file paths added/copied/modified/renamed (exclude deletions).
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+if ! echo "$STAGED" | grep -qE "$TRIGGER_REGEX"; then
+  exit 0
+fi
+
+echo "[pre-commit] Go-affecting files staged. Running checks..."
+echo "[pre-commit] Staged matches:"
+echo "$STAGED" | grep -E "$TRIGGER_REGEX" | sed 's/^/  - /'
+echo ""
+
+FAILED=0
+
+run_step() {
+  local label="$1"
+  shift
+  echo "[pre-commit] $label"
+  if ! "$@"; then
+    echo "[pre-commit] FAIL: $label"
+    FAILED=1
+  fi
+  echo ""
+}
+
+# 1. Format check (gofumpt) — list files that need formatting; success = no output.
+gofumpt_check() {
+  local out
+  out=$(gofumpt -l . 2>&1)
+  if [ -n "$out" ]; then
+    echo "$out" | sed 's/^/  /'
+    return 1
+  fi
+  return 0
+}
+
+# 2. Lint
+lint_check() {
+  golangci-lint run ./...
+}
+
+# 3. Unit tests (race-enabled to match CI)
+test_check() {
+  go test -race ./...
+}
+
+run_step "gofumpt -l ."        gofumpt_check
+run_step "golangci-lint run"   lint_check
+run_step "go test -race ./..." test_check
+
+if [ "$FAILED" -ne 0 ]; then
+  echo "[pre-commit] Aborting commit. Fix the failures above and re-stage."
+  echo "[pre-commit] Do NOT use --no-verify; fix the cause instead."
+  exit 1
+fi
+
+echo "[pre-commit] All Go checks passed."
+exit 0
