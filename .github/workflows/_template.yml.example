@@ -29,7 +29,7 @@ concurrency:
 
 # §4.4: バージョン値は env: で一元管理し、複数箇所への直書きを避ける
 env:
-  GO_VERSION: "1.26.1"
+  GO_VERSION: "1.26.3"
   GOLANGCI_LINT_VERSION: "v2.11.3"
   GOVULNCHECK_VERSION: "v1.1.4"
 
