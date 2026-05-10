@@ -5,10 +5,11 @@ description: >
   auto-fix violations. Runs unconditionally right after `gh pr create` or
   `gh pr edit --body`, and always before reporting "PR created" / "PR updated" to the
   user. Current rules: (1) strip issue auto-close keywords (Closes / Fixes / Resolves
-  etc.) from the PR body so the linked issue is not auto-closed on merge; (2) detect Test
-  plan items that cannot be verified pre-merge (post-merge / post-release observations)
-  and move them to the linked issue, since the PR Test plan is for approval-time
-  verification only.
+  etc.) from the PR body so the linked issue is not auto-closed on merge; (2) keep only
+  items that gate the merge decision in the PR Test plan, moving everything else
+  (post-merge observations, follow-up tests, regression watchlists, doc tasks) to the
+  linked Issue — creating an Issue if none exists — so reviewers can decide approve /
+  not-approve cleanly.
 ---
 
 # pr-lint — PR Project-Rule Linter
@@ -27,12 +28,12 @@ to body edits on existing PRs.
 
 ## Procedure Overview
 
-1. Fetch the PR body and the linked issue number.
+1. Fetch the PR body and the linked Issue number.
 2. Run Check A (auto-close keywords). Stage a rewrite if needed.
-3. Run Check B (un-verifiable test plan items). Stage a rewrite + an issue-side append if
-   needed.
-4. If anything was staged, apply with a single `gh pr edit --body-file` (and a
-   corresponding `gh issue edit` for items moved out).
+3. Run Check B (non-merge-decision items). Stage a PR rewrite + an Issue-side append if
+   needed. If no linked Issue exists, create one and use it.
+4. If anything was staged, apply: `gh pr edit --body-file` and (if items moved)
+   `gh issue edit --body-file` or `gh issue create`.
 5. Report only what changed; if nothing changed, stay silent.
 
 ---
@@ -79,56 +80,90 @@ preserved so the PR-issue link is kept and `Refs #N` still renders as an auto-li
 
 ---
 
-## Check B — Move Un-Verifiable Test Plan Items to the Issue
+## Check B — Keep Only Merge-Decision Tests in the PR
 
 ### Why
 
-A PR Test plan exists so the reviewer can decide "approve / not approve". Items that the
-reviewer cannot perform before merging create a deadlock: approval requires verification,
-verification requires merge, merge requires approval. Such items belong in the linked
-issue under a "post-merge verification" section, where they are picked up after merge and
-gate the issue close instead of the PR approve.
+A PR Test plan exists for one purpose only: **to let a reviewer decide approve / not
+approve**. Anything that does not feed that decision does not belong in the PR.
 
-The PR Test plan must contain only items verifiable before merge. Anything else moves to
-the issue.
+Two categories must be moved out:
+
+1. **Post-merge / post-release observations** (Dependabot scan after merge, next-release
+   `release.yml` behavior, etc.) — the reviewer cannot perform them, and putting them in
+   the PR creates a deadlock: approval requires verification, verification requires
+   merge, merge requires approval.
+2. **Follow-up tests, regression watchlists, ops checklists, future rebase reminders,
+   doc updates** — these may be testable in principle, but they do not gate this PR's
+   merge. They belong with the Issue, not the PR.
+
+Both categories move to the linked Issue under a single `## 動作確認` / `## Verification`
+section. This way the PR stays sharp ("can I approve?") and the Issue stays the durable
+home for everything else ("are we done with this work?"). The Issue is closed only when
+all of its verification items are checked.
+
+If no linked Issue exists, **create one** for this work and move the items there. Never
+discard a real test just because the PR cannot host it; the test belongs somewhere
+durable.
 
 ### Detect
 
-Scan the Test plan section (a heading containing "Test plan" or "テスト" near a checklist
-of `- [ ]` items) for phrases that signal "cannot be verified at PR-review time":
+Two passes against the Test plan section (a heading containing "Test plan" or "テスト"
+near a checklist of `- [ ]` items).
 
-| Pattern (case-insensitive) | Reason it cannot be verified pre-merge |
-|----------------------------|----------------------------------------|
+**Pass 1 — keyword auto-detect.** Items matching any pattern below are unambiguously
+non-merge-decision and move out without further judgment:
+
+| Pattern (case-insensitive) | Reason |
+|----------------------------|--------|
 | `マージ後` / `merge 後` / `after merge` / `post-merge` / `post merge` | Requires the merge to happen first |
 | `develop merge` / `default branch` / `default ブランチ` | Requires landing on the default / target branch |
 | `次回リリース` / `next release` / `on release` | Requires a future release event |
-| `Dependabot` (in a check item)| Dependabot only reads config from default branch |
-| Mention of a workflow trigger that does not fire on PR (e.g. `pull_request: closed`, `push: develop`, `release-*` push) used as a verification step | The trigger does not fire during PR review |
+| `Dependabot` (in a check item) | Dependabot only reads config from default branch |
+| Workflow trigger that does not fire on PR (`pull_request: closed`, `push: develop`, `release-*` push, etc.) used as a verification step | The trigger does not fire during PR review |
+| `follow-up` / `フォローアップ` / `後追い` / `regression watch` / `回帰チェック` / `次回 PR で` | Stated as future work, not this PR's gate |
 
-If there are no such items, skip to Apply step.
+**Pass 2 — judgment.** For each remaining item, ask: *"can a reviewer perform this check
+right now, and does its outcome change whether this PR should be approved?"*. If the
+answer to either part is no, the item is not a merge-decision test. Examples:
+
+- "Update the README in a follow-up PR" → cannot be verified here, doesn't gate this PR
+- "Run nightly load test against staging next week" → not testable now, not a merge gate
+- "After merge, monitor error rate for 24h" → post-merge observation
+
+When Pass 2 is ambiguous (the line could plausibly gate the merge), **leave it in the PR
+and surface it to the user** instead of guessing.
+
+If neither pass produces matches, skip to Apply step.
 
 ### Reclassify
 
 Split the Test plan into two parts:
 
-- **Pre-merge verifiable** (stays in PR): items confirmable from the PR's CI runs, the PR
-  diff, or by observation on the feature branch.
-- **Post-merge / post-release** (moves out): everything matched by the patterns above.
+- **Merge-decision tests** (stays in PR): items the reviewer can perform now and whose
+  outcome would change the approve / not-approve decision.
+- **Everything else** (moves out): all items matched by Pass 1, plus Pass-2 items
+  judged non-gating with confidence.
 
-### Find the linked issue
+### Find or create the linked Issue
 
-The issue number is taken from the PR body. Look for `#<number>` references; if multiple,
-ask the user. If none, skip Check B and report that the items were detected but no issue
-to move them to.
+1. Read the PR body for `#<number>` references and pick the Issue most plausibly tied to
+   this PR's work (usually the one mentioned in `Refs #N` or in the Summary).
+2. If multiple plausible candidates exist, ask the user which is correct.
+3. If none exists, **create one** with `gh issue create`. Title: mirror the PR title (drop
+   the trailing `#N` if present). Body: brief restatement of what this PR delivers, plus
+   the moved verification items under `## 動作確認`. Then add a `Refs #<new-issue>` line
+   to the PR Summary so the connection is visible.
 
 ### Rewrite
 
-- PR body: keep only the pre-merge items in the Test plan. If a Test plan section becomes
-  empty, replace it with a single line noting that all verification is post-merge and
-  pointing to the issue (`See #N for verification checklist`).
+- PR body: keep only the merge-decision items in the Test plan. If the Test plan section
+  becomes empty, replace it with a single line: `See #N for the verification checklist
+  (this PR has no reviewer-side test required)`.
 - Issue body: append (or update if present) a `## 動作確認` / `## Verification` section
   containing the moved items. If the section already exists, merge intelligently —
-  deduplicate, keep existing checklist state.
+  deduplicate, keep existing checklist state. Note that the Issue closes only when all
+  verification items are checked, not on PR merge.
 
 Apply with:
 
@@ -173,9 +208,11 @@ Report only the checks that changed something. Skip silent checks.
 - Check A changed something:
   > PR 本文の auto-close キーワード（Closes/Fixes/Resolves 等）を `Refs` に置換しました。Issue は動作確認完了後に手動でクローズしてください。
 - Check B moved items:
-  > PR Test plan から merge 前に検証不可能な N 件を Issue #M の動作確認セクションへ移しました。
+  > PR Test plan から merge 判定外の N 件を Issue #M の動作確認セクションへ移しました。
+- Check B created an Issue then moved items:
+  > 紐づく Issue が無かったため Issue #M を作成し、merge 判定外の N 件をそこへ移しました。
 - Both:
-  > PR 本文を修正しました: auto-close キーワード除去、merge 前検証不可な N 件を Issue #M へ移動。
+  > PR 本文を修正しました: auto-close キーワード除去、merge 判定外の N 件を Issue #M へ移動。
 
 If nothing changed, stay silent and let the original PR-created / PR-updated report
 continue.
@@ -187,6 +224,8 @@ continue.
 - `Refs #N` does not break GitHub's auto-link.
 - Requires a token with PR-edit and issue-edit permission. If `gh pr edit` or
   `gh issue edit` returns an auth error, refresh via `/gh-token` and retry.
-- Be conservative on Check B — when in doubt about whether an item is pre-merge
-  verifiable, leave it in the PR and tell the user. Better to over-keep in the PR than
-  to silently drop a real check.
+- Be conservative on Check B — when in doubt about whether an item gates this PR's merge,
+  leave it in the PR and tell the user. Better to over-keep in the PR than to silently
+  drop a real check or move it to the wrong place.
+- Never delete a verification item just because it does not belong in the PR. It belongs
+  somewhere durable; either the existing linked Issue or a freshly created one.
