@@ -31,6 +31,7 @@ concurrency:
 env:
   GO_VERSION: "1.26.1"
   GOLANGCI_LINT_VERSION: "v2.11.3"
+  GOVULNCHECK_VERSION: "v1.1.4"
 
 jobs:
   build-and-test:
@@ -69,7 +70,7 @@ jobs:
       # どうしても警告止まりにする場合は §6.3 に従い理由と昇格要件を記録する。
       - name: Vulnerability check
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
           govulncheck ./...
 
   # §1.7（推奨）: 依存のないジョブは並列実行できる構成にする
