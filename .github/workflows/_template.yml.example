@@ -1,0 +1,139 @@
+# CI/CD チェックリスト準拠の模範ワークフロー
+# 参照: central-library/documents/procedures/cicd-checklist.md
+#
+# 動作させない: 拡張子 .example のため GitHub Actions は読み込まない。
+# 利用方法: 必要箇所をコピーして .yml の新規ワークフローを起こす。
+#
+# 章番号はチェックリストの章番号に対応。
+
+# §1.1/1.4: 1 ワークフロー = 1 目的。name は目的を明記する
+name: Example — Build and Test
+
+# §1.2: トリガは目的と整合させる
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+# §3.1: ワークフロー全体の既定権限は最小（contents: read）
+# §3.2: 書き込みが必要なジョブだけ permissions: で個別に上書きする
+permissions:
+  contents: read
+
+# §2.3/2.4/2.5: concurrency は必須。group は「ワークフロー名 + 対象 ref」を基本に。
+# 副作用なし(テスト等) → cancel-in-progress: true
+# 副作用あり(リリース等) → cancel-in-progress: false で直列化
+concurrency:
+  group: example-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# §4.4: バージョン値は env: で一元管理し、複数箇所への直書きを避ける
+env:
+  GO_VERSION: "1.26.3"
+  GOLANGCI_LINT_VERSION: "v2.11.3"
+  GOVULNCHECK_VERSION: "v1.1.4"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    # §2.1/2.2: 全ジョブに timeout-minutes を入れる。値は「正常時 + 安全マージン」
+    timeout-minutes: 20
+    steps:
+      # §4.1: 特権 or 副作用ありかつ信頼境界外の Action は SHA で固定する
+      # §4.2: そうでない補助的 Action でも latest や可変メジャータグは使わない
+      # SHA の右側にバージョンコメントを置くと Dependabot が更新しやすい
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build
+        run: go build ./...
+
+      # §1.4: ステップ name はコードから読み取りにくい「なぜ」を補う
+      # 単に "Lint" ではなく、設定の出所や狙いを書ける場合は書く
+      - name: Install golangci-lint (config in .golangci.yml)
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          install-only: true
+
+      - name: Lint
+        run: golangci-lint run ./...
+
+      - name: Test
+        run: go test -race ./...
+
+      # §5.1: ゲートの失敗を警告で済ませない。
+      # continue-on-error: true や if: always() で握りつぶさない。
+      # どうしても警告止まりにする場合は §6.3 に従い理由と昇格要件を記録する。
+      - name: Vulnerability check
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
+          govulncheck ./...
+
+  # §1.7（推奨）: 依存のないジョブは並列実行できる構成にする
+  validate-source-branch:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate source branch
+        run: |
+          HEAD="${{ github.head_ref }}"
+          if [[ "$HEAD" =~ ^release- || "$HEAD" =~ ^hotfix- ]]; then
+            echo "OK: $HEAD"
+          else
+            echo "REJECTED: main へは release-* / hotfix-* からのみ"
+            exit 1
+          fi
+
+# ----------------------------------------------------------------------------
+# 副作用あり(OIDC/リリース)のジョブを足すときの追加ポイント:
+#
+# permissions:
+#   contents: read           # ワークフロー既定は read のまま
+#
+# concurrency:
+#   group: ...               # cancel-in-progress: false（直列化）
+#
+# jobs:
+#   deploy:
+#     timeout-minutes: 30
+#     permissions:
+#       id-token: write      # §3.2: 必要なジョブだけに昇格
+#       contents: read
+#     steps:
+#       # §3.3: 静的キーではなく OIDC を優先利用
+#       - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+#         with:
+#           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+#           aws-region: ${{ vars.AWS_REGION }}
+#
+# §4.5: 外部取得バイナリは公開ハッシュで取得後検証してから実行する
+#       - name: Install some-binary
+#         env:
+#           BIN_VERSION: "1.2.3"
+#           BIN_SHA256: "abc...def"
+#         run: |
+#           curl -fsSL -o /tmp/bin "https://example.com/bin-v${BIN_VERSION}"
+#           echo "${BIN_SHA256}  /tmp/bin" | sha256sum -c -
+#           install -m 0755 /tmp/bin /usr/local/bin/bin
+#
+# §5.4: リリース成果物・E2E バイナリ等にはコミット識別子(SHA)を埋め込む
+#       - name: Build with version stamp
+#         run: |
+#           SHORT_SHA="${GITHUB_SHA::7}"
+#           go build -trimpath -ldflags "-X main.version=${SHORT_SHA}" -o app .
+#
+# §5.5: 成果物アップロード時は retention-days を意図的に設定する
+#       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+#         with:
+#           name: app-${{ github.sha }}
+#           path: app
+#           retention-days: 30
+#
+# §4.3: 固定した依存先は Dependabot で更新経路を担保する (.github/dependabot.yml)
+# §6.3: チェックリストの一部を省略するなら理由と将来の昇格要件を記録する
+# ----------------------------------------------------------------------------

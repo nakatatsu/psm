@@ -33,7 +33,7 @@ ENV TZ="$TZ"
 
 ARG CLAUDE_CODE_VERSION=latest
 ARG AWS_CLI_VERSION=2.33.31
-ARG GO_VERSION=1.26.1
+ARG GO_VERSION=1.26.3
 ARG GOFUMPT_VERSION=0.9.2
 ARG GOLANGCI_LINT_VERSION=2.11.3
 ARG GOVULNCHECK_VERSION=1.1.4
@@ -54,6 +54,7 @@ COPY --from=git-builder /usr/local/share/git-core/ /usr/local/share/git-core/
 
 # Install basic development tools and iptables/ipset
 # libcurl4 + libexpat1 are runtime deps for the source-built Git
+# gcc + libc6-dev are required by `go test -race` (CGO) so local checks match CI
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   libcurl4 \
@@ -78,6 +79,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   wget \
   ca-certificates \
   locales \
+  gcc \
+  libc6-dev \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Locale
