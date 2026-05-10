@@ -63,14 +63,21 @@ lint_check() {
   golangci-lint run ./...
 }
 
-# 3. Unit tests (race-enabled to match CI)
+# 3. Unit tests. `-race` requires CGO; CI always has it, but the local devcontainer
+#    might not yet (e.g. before the rebuild that introduced gcc). Detect and warn
+#    rather than failing — CI will still gate -race.
 test_check() {
-  go test -race ./...
+  if [ "$(go env CGO_ENABLED)" = "1" ] && command -v gcc >/dev/null 2>&1; then
+    go test -race ./...
+  else
+    echo "  (CGO unavailable — running without -race; CI will run -race)"
+    go test ./...
+  fi
 }
 
-run_step "gofumpt -l ."        gofumpt_check
-run_step "golangci-lint run"   lint_check
-run_step "go test -race ./..." test_check
+run_step "gofumpt -l ."      gofumpt_check
+run_step "golangci-lint run" lint_check
+run_step "go test"           test_check
 
 if [ "$FAILED" -ne 0 ]; then
   echo "[pre-commit] Aborting commit. Fix the failures above and re-stage."

@@ -54,6 +54,7 @@ COPY --from=git-builder /usr/local/share/git-core/ /usr/local/share/git-core/
 
 # Install basic development tools and iptables/ipset
 # libcurl4 + libexpat1 are runtime deps for the source-built Git
+# gcc + libc6-dev are required by `go test -race` (CGO) so local checks match CI
 RUN apt-get update && apt-get install -y --no-install-recommends \
   less \
   libcurl4 \
@@ -78,6 +79,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   wget \
   ca-certificates \
   locales \
+  gcc \
+  libc6-dev \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Locale
